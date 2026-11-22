@@ -388,7 +388,7 @@
       return `<div class="cat-row"><button class="nav-item ${active ? 'active' : ''}" data-act="go-folder" data-cat="${cat}"><span class="cat-ico ${cat}">${icon(CATS[cat].icon, 'sm')}</span><span>${CATS[cat].name}</span><span class="count">${n}</span></button><button class="cat-add" data-act="cat-new-folder" data-cat="${cat}" title="${CATS[cat].name}에 새 폴더" aria-label="${CATS[cat].name}에 새 폴더">${icon('folderPlus', 'sm')}</button></div>${tree(cat, null)}`;
     };
     $('#sidebar').innerHTML = `
-      <button class="brand" data-act="go" data-view="home" aria-label="마음서랍 홈"><span class="brand-mark">${BRAND_SVG}</span><span><b>마음서랍</b><small>사회복지사의 따뜻한 서류함</small></span></button>
+      <button class="brand" data-act="go" data-view="home" aria-label="마음기록 홈"><img class="brand-logo" src="assets/logo-maeum-128.png" alt="마음기록 로고" width="46" height="46" /><span><b>마음기록</b><small class="brand-en">Case Management and Activity System</small></span></button>
       ${nav('home', 'home', '오늘의 서랍')}
       ${nav('fav', 'star', '즐겨찾기', favCount)}
       ${nav('recent', 'clock', '최근 문서')}
