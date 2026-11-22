@@ -1,0 +1,47 @@
+# 마음서랍 · 사회복지사 서류 보관함 & 업무 비서
+
+현장 사회복지사를 위한 따뜻한 감성의 웹 기반 서류 보관함입니다.
+행정 서류와 현장 기록을 폴더로 정리하고, 내장된 **마음기록 도우미(AI)**가 상담 일지·결과보고서 작성을 돕습니다.
+
+- 라이브: https://jake12733.github.io/maeum-drawer/
+- 빌드 없이 동작하는 정적 웹앱 (HTML · CSS · JavaScript)
+
+## 주요 기능
+| 영역 | 기능 |
+|---|---|
+| 서류 보관함 | 일반서류 / 활동서류 대분류, 폴더 생성·이름 변경·삭제, 하위 폴더 + 브레드크럼 |
+| 문서 | 파일 업로드(드래그 앤 드롭), 웹에서 직접 작성·수정, 태그, 즐겨찾기, 검색(제목·폴더명·태그) |
+| 미리보기 | PDF · 이미지 · DOCX · XLSX/CSV · 텍스트 (HWP는 내려받기 안내), 원본 내려받기, 기록은 .doc/.txt/인쇄 |
+| 양식 | 상담 기록지, 프로그램 활동 결과보고서, 프로그램 기획서, 현장 활동지, 사례회의록, 공문 기안문 + 내 양식 지정 |
+| 마음기록 도우미 | 상담 메모 정리, 활동 보고서 초안, 문서 요약·할 일 추출·문장 다듬기, 개인정보 점검(기기 내 1차 탐지 + 가명 처리), 자유 대화 |
+| 편의 | 구비 서류 체크리스트, 화면 잠금(PIN·자동 잠금·Alt+L), 백업/복원 |
+
+## 구조
+```
+index.html            앱 뼈대
+config.js             환경 설정 (DARKCODE_API_MODE / ENDPOINT / MODEL) — 키는 넣지 않음
+assets/store.js       IndexedDB 저장소 + 암호화 Vault (서버 DB로 바꿀 때 이 파일만 교체)
+assets/ai.js          DARKCODE AI API 어댑터 + 페르소나·실무 프롬프트
+assets/templates.js   기본 양식 · 초기 폴더 · 체크리스트
+assets/app.js         화면 · 폴더/문서 · 미리보기 · 에디터 · 도우미 패널 · 잠금
+assets/style.css      디자인 시스템 (아이보리 · 세이지 그린 · 테라코타)
+```
+
+## AI 연결 (DARKCODE AI API)
+화면에는 '마음기록 도우미'로만 보이고, 호출은 `assets/ai.js`의 DARKCODE 어댑터가 담당합니다.
+
+| 모드 | 설명 |
+|---|---|
+| `builtin` | DARKCODE 기본 엔진 (Firebase AI Logic · Gemini). 키 없이 동작, 브라우저당 하루 80회 |
+| `openai` | DARKCODE 게이트웨이 / OpenAI 호환 `POST {endpoint}/chat/completions` (스트리밍) |
+| `gemini` | Gemini API 키 직접 연결 |
+| `anthropic` | Claude API 키 직접 연결 |
+| `custom` | `POST {endpoint}` JSON `{ task, system, messages }` → `{ text }` |
+
+- 기본값은 `config.js`(환경변수 역할), 사용자는 앱의 **설정 · 백업** 창에서 바꿀 수 있습니다.
+- API 키는 브라우저 IndexedDB에 AES-GCM(추출 불가 키)으로 암호화해 보관하며, 저장소 코드에는 넣지 않습니다.
+- 운영 환경에서는 키를 서버 게이트웨이(프록시)에 두고 `openai` 또는 `custom` 모드로 연결하는 구성을 권장합니다.
+
+## 데이터
+- 모든 서류는 사용자의 브라우저(IndexedDB)에만 저장됩니다. 서버로 전송되지 않습니다. (AI 기능을 쓸 때 입력한 글만 연결된 AI로 전송)
+- 브라우저 기록 삭제 시 사라질 수 있으니 설정 창의 **백업 파일 받기**를 이용하세요.
