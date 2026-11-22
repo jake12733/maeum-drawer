@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>마음서랍 · 사회복지사 서류 보관함</title>
-  <meta name="description" content="사회복지사를 위한 따뜻한 서류 보관함과 업무 비서. 일반서류·활동서류 폴더 관리, 양식 템플릿, 마음기록 도우미(AI)로 상담 일지와 결과보고서 작성을 도와요." />
+  <meta name="description" content="사회복지사를 위한 따뜻한 서류 보관함과 업무 비서. 일반·활동 서류 폴더, 교육·정보·활동 라운지, 인스타·틱톡·유튜브 연동, 마음기록 도우미(AI)로 상담 일지와 결과보고서 작성을 도와요." />
   <meta name="theme-color" content="#FAF8F5" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234A7C59'/%3E%3Cpath d='M18 26h28v20a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4z' fill='%23FAF8F5'/%3E%3Crect x='15' y='18' width='34' height='9' rx='3' fill='%23FAF8F5'/%3E%3Cpath d='M32 44c-5-3.6-8-6.4-8-9.4a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 3-3 5.8-8 9.4z' fill='%23E07A5F'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-  <link rel="stylesheet" href="assets/style.css?v=20261122d" />
+  <link rel="stylesheet" href="assets/style.css?v=20261122e" />
 </head>
 <body>
   <div class="app" id="app">
@@ -28,6 +28,7 @@
         </label>
         <div class="top-actions">
           <button class="btn btn-helper" id="aiToggle" aria-label="마음기록 도우미 열기"></button>
+          <button class="user-chip" id="userChip" data-act="account" aria-label="내 계정"></button>
           <button class="icon-btn lock-btn" id="lockBtn" title="화면 잠금 (Alt + L)" aria-label="화면 잠금"></button>
         </div>
       </header>
@@ -41,13 +42,16 @@
   <div id="modalRoot"></div>
   <div class="toast-root" id="toastRoot" aria-live="polite"></div>
   <div class="lock-screen" id="lockScreen" hidden></div>
+  <div class="auth-gate" id="authGate"></div>
   <div class="drop-hint" id="dropHint" hidden><div><span id="dropIco"></span><b>여기에 놓으면 지금 폴더에 보관할게요</b><small>PDF · HWP · DOCX · XLSX · 이미지 등</small></div></div>
   <input type="file" id="fileInput" multiple hidden />
 
-  <script src="config.js?v=20261122d"></script>
-  <script src="assets/store.js?v=20261122d"></script>
-  <script src="assets/templates.js?v=20261122d"></script>
-  <script src="assets/ai.js?v=20261122d"></script>
-  <script src="assets/app.js?v=20261122d"></script>
+  <script src="config.js?v=20261122e"></script>
+  <script src="assets/store.js?v=20261122e"></script>
+  <script src="assets/templates.js?v=20261122e"></script>
+  <script src="assets/lounge.js?v=20261122e"></script>
+  <script src="assets/auth.js?v=20261122e"></script>
+  <script src="assets/ai.js?v=20261122e"></script>
+  <script src="assets/app.js?v=20261122e"></script>
 </body>
 </html>
