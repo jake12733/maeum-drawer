@@ -285,23 +285,36 @@ ${parts.join('\n\n')}
     };
 
     if (mode === 'builtin' || mode === 'gemini') {
-      let url; const headers = { 'Content-Type': 'application/json' };
-      if (mode === 'builtin') {
-        const C = DARKCODE_BUILTIN;
-        if (usage() >= C.dailyCap) throw new AIError(`오늘 기본 엔진 사용량(${C.dailyCap}회)을 모두 썼어요. 내일 다시 쓰거나 설정에서 다른 연결을 추가해 주세요.`, 429);
-        url = `https://firebasevertexai.googleapis.com/v1beta/projects/${C.projectId}/models/${model}:streamGenerateContent?alt=sse`;
-        headers['x-goog-api-key'] = C.apiKey;
-        headers['X-Firebase-AppId'] = C.appId;
-        try { const tk = await appCheckToken(); if (tk) headers['X-Firebase-AppCheck'] = tk; } catch (e) { console.warn('appcheck', e); }
-      } else {
-        url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
-        headers['x-goog-api-key'] = key;
+      // 한 번 호출 (스트림이 종료 신호 없이 끊기면 fin=false)
+      const once = async (msgs, prefix) => {
+        let url; const headers = { 'Content-Type': 'application/json' };
+        if (mode === 'builtin') {
+          const C = DARKCODE_BUILTIN;
+          if (usage() >= C.dailyCap) throw new AIError(`오늘 기본 엔진 사용량(${C.dailyCap}회)을 모두 썼어요. 내일 다시 쓰거나 설정에서 다른 연결을 추가해 주세요.`, 429);
+          url = `https://firebasevertexai.googleapis.com/v1beta/projects/${C.projectId}/models/${model}:streamGenerateContent?alt=sse`;
+          headers['x-goog-api-key'] = C.apiKey;
+          headers['X-Firebase-AppId'] = C.appId;
+          try { const tk = await appCheckToken(); if (tk) headers['X-Firebase-AppCheck'] = tk; } catch (e) { console.warn('appcheck', e); }
+        } else {
+          url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
+          headers['x-goog-api-key'] = key;
+        }
+        const body = { contents: toGemini(msgs), systemInstruction: { parts: [{ text: system }] }, generationConfig: { temperature, maxOutputTokens: 8192 } };
+        const res = await doFetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        if (!res.ok) throw await readError(res);
+        if (mode === 'builtin') bump();
+        let fin = false;
+        const out = await streamParse(res, (j) => { if (j.candidates?.[0]?.finishReason) fin = true; return (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join(''); }, (p, all) => onToken && onToken(p, prefix + all));
+        return { out, fin };
+      };
+      let all = ''; let msgs = messages;
+      for (let round = 0; round < 3; round++) {
+        const { out, fin } = await once(msgs, all);
+        all += out;
+        if (fin || !out) break;
+        msgs = messages.concat([{ role: 'assistant', content: all }, { role: 'user', content: '방금 답변이 중간에 끊겼어요. 끊긴 지점 바로 다음 글자부터 이어서 끝까지 작성해 주세요. 앞부분은 반복하지 말고, 인사말 없이 이어지는 내용만 써 주세요.' }]);
       }
-      const body = { contents: toGemini(messages), systemInstruction: { parts: [{ text: system }] }, generationConfig: { temperature, maxOutputTokens: 8192 } };
-      const res = await doFetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
-      if (!res.ok) throw await readError(res);
-      if (mode === 'builtin') bump();
-      return streamParse(res, (j) => (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join(''), onToken);
+      return all;
     }
 
     if (mode === 'openai') {

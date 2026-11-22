@@ -37,6 +37,7 @@ body {
 }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
+a.btn { text-decoration: none; color: inherit; }
 a { color: var(--primary); }
 svg.ic { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 svg.ic.sm { width: 15px; height: 15px; }

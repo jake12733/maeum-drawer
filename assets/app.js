@@ -445,6 +445,7 @@
         ${HERO_ART}
       </section>
       <div class="stats">${stats.map((s) => `<button class="card stat" ${s.act}><span class="s-ico" style="background:${s.bg};color:${s.fg}">${icon(s.ico)}</span><span><b>${s.n}</b><small>${s.l}</small></span></button>`).join('')}</div>
+      ${loungeSection()}
       <div class="grid-2 section">
         <div>
           <div class="section-head"><h3>${icon('clock')} 최근 문서</h3><button class="link-btn" data-act="go" data-view="recent">전체 보기 ${icon('chevR', 'sm')}</button></div>
@@ -455,7 +456,6 @@
           <div class="tool-grid">${tools.map(([tab, ico, t, d]) => `<button class="tool-card" data-act="ai-open" data-tab="${tab}"><span class="t-ico">${icon(ico)}</span><span><b>${t}</b><small>${d}</small></span></button>`).join('')}</div>
         </div>
       </div>
-      ${loungeSection()}
       <div class="grid-2 section">
         <div>
           <div class="section-head"><h3>${icon('layout')} 자주 쓰는 양식</h3><button class="link-btn" data-act="go" data-view="templates">양식 모두 보기 ${icon('chevR', 'sm')}</button></div>
@@ -905,7 +905,8 @@
 
   function openAddLink({ cat, folderId, url = '', name = '' } = {}) {
     const cur = currentLoc();
-    const loc = cat ? { cat, folderId: folderId ?? (cur && cur.cat === cat ? cur.folderId : null) } : (cur || { cat: 'act', folderId: (topFolderByName('act', 'SNS 홍보') || {}).id || null });
+    const snsF = (topFolderByName('act', 'SNS 홍보') || {}).id || null;
+    const loc = cat ? { cat, folderId: folderId ?? (cur && cur.cat === cat ? cur.folderId : (cat === 'act' ? snsF : null)) } : (cur || { cat: 'act', folderId: (topFolderByName('act', 'SNS 홍보') || {}).id || null });
     const m = openModal({ title: '링크 · SNS 게시물 추가', sub: '유튜브 · 인스타그램 · 틱톡 주소는 화면 안에서 바로 재생돼요.', body: `
       <label class="field"><span>주소 (URL)</span><input class="input" id="alUrl" value="${esc(url)}" placeholder="예) https://www.youtube.com/watch?v=… / https://www.instagram.com/p/… / https://www.tiktok.com/@…/video/…" /><small id="alHint">주소를 붙여 넣으면 종류를 알아서 알아봐요.</small></label>
       <label class="field"><span>제목</span><input class="input" id="alName" value="${esc(name)}" placeholder="비워 두면 자동으로 채워요" maxlength="90" /></label>
@@ -1062,7 +1063,7 @@
     const m = openModal({
       title: d.name, size: 'wide', bodyClass: 'preview-body',
       headExtra: ftypeBadge(d),
-      body: `<div class="meta-strip"><span>${icon('folder', 'sm')} ${esc(pathLabel(d))}</span><span>${fmtSize(d.size)}</span><span>수정 ${fmtDate(d.updatedAt)}</span>${tags ? `<span>${tags}</span>` : ''}</div><div id="pvArea" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:auto"><div class="no-preview"><div class="thinking"><i></i><i></i><i></i> 문서를 펼치는 중이에요…</div></div></div>`,
+      body: `<div class="meta-strip"><span>${icon('folder', 'sm')} ${esc(pathLabel(d))}</span>${d.kind === 'link' ? '' : `<span>${fmtSize(d.size)}</span>`}<span>수정 ${fmtDate(d.updatedAt)}</span>${tags ? `<span>${tags}</span>` : ''}</div><div id="pvArea" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:auto"><div class="no-preview"><div class="thinking"><i></i><i></i><i></i> 문서를 펼치는 중이에요…</div></div></div>`,
       foot: `<div class="left"><button class="btn ghost sm" data-pv="delete">${icon('trash', 'sm')} 삭제</button><button class="btn ghost sm" data-pv="move">${icon('move', 'sm')} 옮기기</button><button class="btn ghost sm" data-pv="meta">${icon('tag', 'sm')} 이름·태그</button></div>
         <button class="btn sm star-btn ${d.favorite ? 'on' : ''}" data-pv="star">${icon('star', 'sm')} ${d.favorite ? '고정됨' : '즐겨찾기'}</button>
         ${canExtract(d) ? `<button class="btn sm" data-pv="ai">${icon('sparkle', 'sm')} 도우미 요약</button>` : ''}
