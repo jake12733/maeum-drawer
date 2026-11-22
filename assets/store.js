@@ -15,16 +15,24 @@ const Store = (() => {
   function open() {
     if (dbp) return dbp;
     dbp = new Promise((resolve) => {
+      let settled = false;
+      const finish = (db) => { if (settled) { if (db) db.close(); return; } settled = true; resolve(db); };
+      // 다른 탭이 데이터베이스를 붙잡고 있어 열리지 않으면 4초 뒤 메모리 모드로 계속합니다.
+      setTimeout(() => { if (!settled) { memoryOnly = true; finish(null); } }, 4000);
       try {
         const req = indexedDB.open(DB_NAME, DB_VER);
         req.onupgradeneeded = () => {
           const db = req.result;
           ['kv', 'blobs', 'vault'].forEach((s) => { if (!db.objectStoreNames.contains(s)) db.createObjectStore(s); });
         };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => { memoryOnly = true; resolve(null); };
-        req.onblocked = () => { memoryOnly = true; resolve(null); };
-      } catch (e) { memoryOnly = true; resolve(null); }
+        req.onsuccess = () => {
+          const db = req.result;
+          // 다른 탭에서 초기화·업그레이드할 때 연결을 양보합니다.
+          db.onversionchange = () => { db.close(); dbp = null; };
+          finish(db);
+        };
+        req.onerror = () => { memoryOnly = true; finish(null); };
+      } catch (e) { memoryOnly = true; finish(null); }
     });
     return dbp;
   }
