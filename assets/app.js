@@ -103,7 +103,7 @@
   }
 
   function seed() {
-    const t0 = now() - 1000 * 60 * 60 * 24 * 6;
+    const t0 = now() - 1000 * 60 * 60 * 24 * 20;
     const st = { version: 1, folders: [], docs: [], checklists: [], settings: { userName: '', pinHash: '', pinSalt: '', autoLockMin: 0 } };
     const mk = (cat, name, parentId = null) => { const f = { id: uid('f'), cat, name, parentId, createdAt: t0 }; st.folders.push(f); return f; };
     Object.entries(SEED_FOLDERS).forEach(([cat, names]) => names.forEach((n) => mk(cat, n)));
@@ -820,7 +820,7 @@
         area.innerHTML = `<div class="paper html">${tmp.innerHTML || '<p>(내용이 비어 있어요)</p>'}</div>`;
       } else if (['xlsx', 'xls', 'csv', 'ods'].includes(d.ext)) {
         const X = await loadLib('xlsx');
-        const wb = d.ext === 'csv' ? X.read(await blob.text(), { type: 'string' }) : X.read(await blob.arrayBuffer(), { type: 'array' });
+        const wb = d.ext === 'csv' ? X.read(await blob.text(), { type: 'string', raw: true }) : X.read(await blob.arrayBuffer(), { type: 'array' });
         const show = (name) => {
           const html = X.utils.sheet_to_html(wb.Sheets[name], { header: '', footer: '' });
           area.innerHTML = `<div class="sheet-tabs">${wb.SheetNames.map((n) => `<button class="btn sm ${n === name ? 'soft' : 'ghost'}" data-sheet="${esc(n)}">${esc(n)}</button>`).join('')}</div><div class="sheet-wrap">${html}</div>`;
