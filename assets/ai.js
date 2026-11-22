@@ -349,6 +349,134 @@ ${parts.join('\n\n')}
     throw new AIError('알 수 없는 연결 방식이에요.');
   }
 
+  /* =========================================================
+   * 검색 답변 · 사진 만들기 · 양식 생성
+   * ========================================================= */
+  const SEARCH_PERSONA = `당신은 '마음기록 도우미'입니다. 사회복지사가 물어보는 내용을 인터넷(Google 검색)에서 찾아 정확하고 따뜻하게 알려 주는 동료입니다.
+- 반드시 검색 결과를 근거로 답하고, 검색으로 확인되지 않는 내용은 지어내지 말고 '확인되지 않았어요'라고 말합니다.
+- 법령·지침·일정·금액은 공식 출처(보건복지부, 법제처, 한국사회복지사협회, 큐넷 등)를 우선하고 기준 날짜를 함께 적습니다.
+- 한국어 존댓말(~해요)로, 핵심부터 간결하게 답합니다. 필요하면 '## ' 제목, '- ' 목록, 표를 씁니다.
+- 개인정보나 실제 사례 정보가 들어오면 검색어에 넣지 않습니다.`;
+
+  async function builtinFetch(model, body, stream) {
+    const C = DARKCODE_BUILTIN;
+    if (usage() >= C.dailyCap) throw new AIError(`오늘 기본 엔진 사용량(${C.dailyCap}회)을 모두 썼어요. 내일 다시 써 주세요.`, 429);
+    const url = `https://firebasevertexai.googleapis.com/v1beta/projects/${C.projectId}/models/${model}:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`;
+    const headers = { 'Content-Type': 'application/json', 'x-goog-api-key': C.apiKey, 'X-Firebase-AppId': C.appId };
+    try { const tk = await appCheckToken(); if (tk) headers['X-Firebase-AppCheck'] = tk; } catch (e) { console.warn('appcheck', e); }
+    let res;
+    try { res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) }); }
+    catch (e) { throw new AIError('도우미 서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.'); }
+    return res;
+  }
+
+  // 인터넷 검색 기반 답변: DuckDuckGo 검색 결과 → 상위 자료 페이지 읽기(URL Context) → 출처 번호를 붙여 답변
+  const OFFICIAL = /(\.go\.kr|welfare\.net|q-net\.or\.kr|law\.go\.kr|bokjiro|korea\.kr|ssis\.or\.kr|vms\.or\.kr|1365\.go\.kr|or\.kr)/i;
+  async function search({ question, history = [], onToken, onStatus, signal }) {
+    const s = getSettings();
+    const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+    const system = SEARCH_PERSONA + '\n- 오늘은 ' + today + '입니다.';
+    if (s.mode !== 'builtin' && s.mode !== 'gemini') {
+      const text = await callEngine({ system: system + '\n- (이 연결 방식은 인터넷 검색을 지원하지 않으므로 알고 있는 범위에서 답하고 최신 여부를 확인하라고 안내합니다.)', messages: history.concat([{ role: 'user', content: question }]), onToken, signal, task: 'search' });
+      return { text, sources: [], queries: [], searched: false };
+    }
+    const model = s.model || MODES[s.mode].defaultModel;
+    const gen = async (body, stream) => {
+      let res;
+      if (s.mode === 'builtin') res = await builtinFetch(model, body, stream);
+      else {
+        const key = await getKey('gemini'); if (!key) throw new AIError('설정에서 연결 키를 먼저 입력해 주세요.');
+        res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':' + (stream ? 'streamGenerateContent?alt=sse' : 'generateContent'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body), signal });
+      }
+      if (!res.ok) throw await readError(res);
+      if (s.mode === 'builtin') bump();
+      return res;
+    };
+    // 1) 검색
+    onStatus && onStatus('인터넷에서 찾고 있어요…');
+    const q = question.replace(/\s+/g, ' ').trim().slice(0, 120);
+    const ddg = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q) + '&kl=kr-kr';
+    let results = []; let searchOk = false;
+    try {
+      const resA = await gen({ contents: [{ role: 'user', parts: [{ text: '아래 검색 결과 페이지를 읽고, 질문에 도움이 될 결과를 최대 6개 골라 JSON 배열로만 출력하세요. 각 항목은 {"title":"제목","url":"실제 결과 주소(duckduckgo 주소가 아닌 원래 사이트 주소)","snippet":"요약 한두 문장"} 입니다. 페이지에 없는 결과는 절대 만들지 마세요.\n질문: ' + question + '\n검색 결과 페이지: ' + ddg }] }], tools: [{ urlContext: {} }], generationConfig: { temperature: 0, maxOutputTokens: 2048 } }, false);
+      const jA = await resA.json();
+      const cA = jA.candidates?.[0] || {};
+      searchOk = (cA.urlContextMetadata?.urlMetadata || []).some((u) => /SUCCESS/.test(u.urlRetrievalStatus || ''));
+      const tA = (cA.content?.parts || []).map((p) => p.text || '').join('');
+      const arr = /\[[\s\S]*\]/.exec(tA);
+      if (searchOk && arr) {
+        const seen = new Set();
+        results = JSON.parse(arr[0]).filter((r) => r && /^https?:\/\//.test(r.url || '') && !/duckduckgo\.com/.test(r.url) && !seen.has(r.url) && seen.add(r.url)).slice(0, 6)
+          .map((r) => ({ title: String(r.title || '').slice(0, 120), url: r.url, snippet: String(r.snippet || '').slice(0, 300) }));
+      }
+    } catch (e) { if (e instanceof AIError && e.status === 429) throw e; console.warn('search step', e); }
+    // 공식 출처를 앞으로
+    results.sort((a, b) => (OFFICIAL.test(b.url) ? 1 : 0) - (OFFICIAL.test(a.url) ? 1 : 0));
+    // 2) 읽고 답하기
+    onStatus && onStatus(results.length ? '찾은 자료를 읽고 정리하고 있어요…' : '검색 결과가 없어 알고 있는 범위에서 답하고 있어요…');
+    const ctx = results.map((r, i) => '[' + (i + 1) + '] ' + r.title + '\n' + r.url + '\n' + r.snippet).join('\n\n');
+    const read = results.slice(0, 3).map((r) => r.url);
+    const prompt = results.length
+      ? '질문: ' + question + '\n\n[검색 결과]\n' + ctx + '\n\n[자세히 읽을 페이지]\n' + read.join('\n') + '\n\n위 자료를 근거로 답하세요. 근거가 되는 문장 끝에 [1]처럼 검색 결과 번호를 붙이세요. 자료에서 확인되지 않는 내용은 확인되지 않았다고 말하세요. 마지막에 출처 목록은 따로 쓰지 마세요(화면에 자동으로 표시됩니다).'
+      : '질문: ' + question + '\n\n(인터넷 검색 결과를 가져오지 못했습니다. 알고 있는 범위에서 답하되, 최신 정보는 공식 사이트에서 확인하라고 안내하세요.)';
+    const base = history.concat([{ role: 'user', content: prompt }]);
+    const once = async (msgs, prefix) => {
+      const res = await gen({ contents: toGemini(msgs), systemInstruction: { parts: [{ text: system }] }, tools: results.length ? [{ urlContext: {} }] : undefined, generationConfig: { temperature: 0.3, maxOutputTokens: 8192 } }, true);
+      let fin = false;
+      const out = await streamParse(res, (j) => { const c = j.candidates?.[0]; if (!c) return ''; if (c.finishReason) fin = true; return (c.content?.parts || []).map((p) => p.text || '').join(''); }, (p, all) => onToken && onToken(p, prefix + all));
+      return { out, fin };
+    };
+    let all = ''; let msgs = base;
+    for (let round = 0; round < 3; round++) {
+      const { out, fin } = await once(msgs, all);
+      all += out;
+      if (fin || !out) break;
+      msgs = base.concat([{ role: 'assistant', content: all }, { role: 'user', content: '답변이 중간에 끊겼어요. 끊긴 지점 바로 다음부터 이어서 끝까지 써 주세요. 앞부분은 반복하지 마세요.' }]);
+    }
+    return { text: all, sources: results.map((r) => ({ title: r.title, uri: r.url })), queries: [q], searched: results.length > 0 };
+  }
+
+  // 사진 만들기 (무료 이미지 생성 · 한국어 요청은 영어 프롬프트로 바꿔서 전달)
+  async function image({ prompt, ratio = '1:1', style = '' }) {
+    const full = prompt + (style ? '\n스타일: ' + style : '') + '\n글자·워터마크 없이. 사람이 나오면 한국인으로 자연스럽게.';
+    let en = prompt;
+    try { en = (await callEngine({ system: 'Rewrite the user request as one vivid English prompt for an image generator (max 70 words). Keep the requested style. If people appear, they are Korean. No text in the image. Output only the prompt.', messages: [{ role: 'user', content: full }], task: 'image-prompt' })).trim().replace(/^"|"$/g, ''); } catch (e) {}
+    const [w, h] = { '1:1': [1024, 1024], '16:9': [1280, 720], '3:4': [864, 1152], '9:16': [720, 1280] }[ratio] || [1024, 1024];
+    const seed = Math.floor(Math.random() * 1e6);
+    const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(en) + '?width=' + w + '&height=' + h + '&nologo=true&seed=' + seed;
+    let res;
+    try { res = await fetch(url); } catch (e) { throw new AIError('사진을 만들지 못했어요. 잠시 후 다시 시도해 주세요.'); }
+    if (!res.ok) throw new AIError('사진을 만들지 못했어요. (' + res.status + ') 잠시 후 다시 시도해 주세요.');
+    const blob = await res.blob();
+    if (!/^image\//.test(blob.type)) throw new AIError('사진을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+    return { blob, prompt: en, seed };
+  }
+
+  // 양식 만들기
+  async function template({ kind, features, onToken, signal }) {
+    const system = `당신은 사회복지 현장의 행정·기록 양식을 만드는 전문가입니다. 요청에 맞는 '빈 양식'을 만듭니다.
+[원칙]
+- 실제 이름·연락처·예시 내용을 채우지 말고 적는 칸만 만듭니다. (예: '- 상담일시 :', 단일·복수 선택은 □ 체크박스)
+- 한글·워드에 붙여 넣기 좋은 일반 텍스트로 씁니다. 구분은 ■ 소제목, 번호는 1. 가. 1) 체계, 표가 필요하면 | 칸 | 형식을 씁니다.
+- 마크다운 기호(#, **, \`\`\`)는 쓰지 않습니다.
+- 필요하면 마지막에 개인정보 보호 안내나 결재란을 넣습니다.
+[출력 형식 — 반드시 지킬 것]
+제목: [양식] (양식 이름)
+설명: (이 양식이 무엇에 쓰이는지 30자 이내)
+---
+(양식 본문)`;
+    const content = `양식 종류: ${kind || '(자유)'}
+양식 특징·요청사항: ${features || '(없음)'}`;
+    const raw = await callEngine({ system, messages: [{ role: 'user', content }], onToken, signal, task: 'template' });
+    const m = /제목\s*[:：]\s*(.+)/.exec(raw); const d = /설명\s*[:：]\s*(.+)/.exec(raw);
+    const sep = raw.indexOf('---');
+    let body = sep >= 0 ? raw.slice(sep + 3) : raw.replace(/^.*제목.*\n?/, '').replace(/^.*설명.*\n?/, '');
+    body = body.replace(/^\s*```\w*\n?|```\s*$/g, '').replace(/\*\*(.+?)\*\*/g, '$1').trim();
+    let name = (m ? m[1] : `[양식] ${kind || '새 양식'}`).trim();
+    if (!/^\[양식\]/.test(name)) name = '[양식] ' + name;
+    return { name: name.slice(0, 60), desc: (d ? d[1] : '').trim().slice(0, 60), body };
+  }
+
   /* ---------- 공개 API ---------- */
   async function run({ task = 'chat', fields = {}, history = [], onToken, signal }) {
     const t = TASKS[task] || TASKS.chat;
@@ -365,5 +493,5 @@ ${parts.join('\n\n')}
     return MODES[s.mode].label.replace(/ \(.*\)$/, '');
   }
 
-  return { MODES, TASKS, PERSONA, getSettings, saveSettings, getKey, setKey, hasKey, run, test, usage, engineLabel, dailyCap: DARKCODE_BUILTIN.dailyCap };
+  return { MODES, TASKS, PERSONA, getSettings, saveSettings, getKey, setKey, hasKey, run, test, usage, engineLabel, search, image, template, dailyCap: DARKCODE_BUILTIN.dailyCap };
 })();

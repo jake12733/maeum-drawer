@@ -111,7 +111,7 @@
   let S = null;
   let route = { view: 'home' };
   let prevRoute = { view: 'home' };
-  const ui = { sort: 'updated', aiOpen: false, aiTab: 'memo' };
+  const ui = { sort: 'updated', aiOpen: false, aiTab: 'search' };
   let saveTimer = null;
   function save() {
     clearTimeout(saveTimer);
@@ -153,6 +153,11 @@
     });
     st.demoCleaned = true;
   }
+  function cleanAiText(st) {
+    if (st.aiTextFixed) return;
+    st.docs.forEach((d) => { if (d.kind === 'note' && d.name === 'SNS 홍보 전 체크리스트' && d.content) d.content = d.content.replace('□ 마음기록 도우미 ‘SNS 홍보’로 캡션을 만들고, ‘개인정보 점검’으로 한 번 더 확인했나요?', '□ ‘SNS로 공유’ 창의 개인정보 자동 점검 결과를 확인했나요?'); });
+    st.aiTextFixed = true;
+  }
   function addLounge(st) {
     if (st.seedLounge || typeof LOUNGE === 'undefined') return;
     const t0 = now() - 1000 * 60 * 60 * 3;
@@ -174,6 +179,7 @@
     }
     addLounge(st);
     cleanDemo(st);
+    cleanAiText(st);
     return st;
   }
 
@@ -398,8 +404,8 @@
       ${catItem('act')}
       <div class="side-card">
         <h4>${helperAva()} 마음기록 도우미</h4>
-        <p>거친 메모도 괜찮아요. 상담 일지와 보고서 초안을 함께 정리해 드릴게요.</p>
-        <button class="btn accent sm block" data-act="ai-open" data-tab="memo">${icon('sparkle', 'sm')} 도우미 부르기</button>
+        <p>궁금한 건 인터넷에서 찾아 알려 드리고, 홍보용 사진도 만들어 드려요.</p>
+        <button class="btn accent sm block" data-act="ai-open" data-tab="search">${icon('sparkle', 'sm')} 도우미 부르기</button>
       </div>
       <div class="side-foot">
         <button class="nav-item" data-act="settings">${icon('settings')}<span>설정 · 백업</span></button>
@@ -432,7 +438,7 @@
     const name = S.settings.userName ? `${esc(S.settings.userName)} 선생님` : '선생님';
     if (h < 11) return [`좋은 아침이에요, ${name}`, '오늘의 기록을 차곡차곡 정리해 볼까요?'];
     if (h < 17) return [`오늘 오후도 힘내세요, ${name}`, '현장의 이야기를 잊기 전에 살짝 적어 두면 좋아요.'];
-    return [`오늘 하루도 수고 많으셨어요, ${name}`, '남은 기록은 마음기록 도우미와 함께 가볍게 마무리해요.'];
+    return [`오늘 하루도 수고 많으셨어요, ${name}`, '궁금한 건 마음기록 도우미에게 물어보며 가볍게 마무리해요.'];
   }
 
   function viewHome() {
@@ -446,10 +452,8 @@
     ];
     const recent = S.docs.slice().sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 6);
     const tools = [
-      ['memo', 'chat', '상담 메모 정리', '키워드만 적어도 상담 일지 형식으로 정리해요.'],
-      ['report', 'chart', '활동 보고서 초안', '프로그램 개요로 결과보고서 초안을 만들어요.'],
-      ['summary', 'listChecks', '문서 요약·핵심 추출', '긴 공문·회의록에서 할 일과 기한만 쏙.'],
-      ['privacy', 'shield', '개인정보 점검', '공유 전 이름·연락처·주소를 찾아 가명 처리해요.'],
+      ['search', 'search', '검색해서 알려줘', '궁금한 제도·일정·지침을 인터넷에서 찾아 출처와 함께 알려 드려요.'],
+      ['image', 'image', '사진 만들기', '홍보물·게시물에 쓸 이미지를 원하는 분위기로 만들어 드려요.'],
     ];
     const favTpl = S.docs.filter((d) => d.template && d.favorite).slice(0, 6);
     return `
@@ -625,7 +629,8 @@
 
   function viewTemplates() {
     const tpls = S.docs.filter((d) => d.template);
-    return `<div class="page-head"><div><h2>${icon('layout', 'lg')} 양식 템플릿</h2><p>자주 쓰는 양식으로 새 문서를 바로 만들어요. 내 문서도 ‘양식으로 지정’하면 여기에 모여요.</p></div></div>
+    return `<div class="page-head"><div><h2>${icon('layout', 'lg')} 양식 템플릿</h2><p>자주 쓰는 양식으로 새 문서를 바로 만들어요. 필요한 양식은 ‘양식 추가하기’에 적으면 AI가 만들어 드려요.</p></div>
+      <div class="toolbar"><button class="btn primary" data-act="tpl-new">${icon('plus')} 양식 추가하기</button></div></div>
       <div class="tool-grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
       ${tpls.map((d) => `<div class="card" style="padding:18px;display:flex;flex-direction:column;gap:12px">
           <div style="display:flex;gap:12px;align-items:flex-start"><span class="t-ico" style="width:42px;height:42px;border-radius:12px;background:${d.cat === 'activity' ? 'var(--accent-soft)' : '#EEF2F8'};color:${d.cat === 'activity' ? 'var(--accent-dark)' : '#4F6B8F'};display:grid;place-items:center;flex:none">${icon(d.tplIcon || 'fileText')}</span>
@@ -633,6 +638,7 @@
           <button class="icon-btn sm star-btn ${d.favorite ? 'on' : ''}" data-act="doc-star" data-id="${d.id}" aria-label="즐겨찾기">${icon('star')}</button></div>
           <div style="display:flex;gap:8px;margin-top:auto"><button class="btn primary sm" data-act="use-template" data-id="${d.id}">${icon('pencil', 'sm')} 이 양식으로 작성</button><button class="btn sm" data-act="doc-open" data-id="${d.id}">${icon('eye', 'sm')} 미리보기</button></div>
         </div>`).join('')}
+      <button class="card tpl-add" data-act="tpl-new">${icon('sparkle', 'lg')}<b>양식 추가하기</b><small>양식 종류와 특징을 적으면 AI가 빈 양식을 만들어 드려요</small></button>
       </div>`;
   }
 
@@ -801,9 +807,6 @@
       d.kind === 'note' && { label: d.template ? '양식 지정 해제' : '내 양식으로 지정', icon: 'pin', fn: () => { d.template = !d.template; if (d.template) { d.favorite = true; d.tplIcon ||= 'fileText'; } save(); renderAll(); toast(d.template ? '양식 템플릿에 추가했어요.' : '양식 지정을 해제했어요.'); } },
       d.kind === 'link' ? { label: '새 탭에서 열기', icon: 'external', fn: () => openExternal(d.url) } : { label: '내려받기', icon: 'download', fn: () => downloadDoc(id, null, anchor) },
       (d.kind === 'note' || d.kind === 'link' || ftype(d).cls === 'img') && { label: 'SNS로 공유', icon: 'share', fn: () => openShare({ docId: id, title: d.name }) },
-      '-',
-      { label: '도우미로 요약하기', icon: 'sparkle', fn: () => sendDocToAI(id, 'summary') },
-      { label: '개인정보 점검', icon: 'shield', fn: () => sendDocToAI(id, 'privacy') },
       '-',
       { label: '삭제', icon: 'trash', danger: true, fn: () => deleteDoc(id) },
     ].filter(Boolean);
@@ -990,7 +993,7 @@
     const chips = snsList().map((e) => '<button class="sns-chip ' + (snsOn(e) ? 'on' : '') + '" data-act="go" data-view="social">' + snsBadge(e.type, 'xs') + ' ' + esc(snsOn(e) ? snsName(e) + (e.handle ? ' · ' + e.handle : '') : snsName(e) + ' 연결') + '</button>').join('');
     return '<div class="sns-strip card"><span class="sns-strip-t">' + icon('share', 'sm') + ' 연동된 SNS</span>' + chips +
       '<button class="sns-chip" data-act="sns-add">' + icon('plus', 'sm') + ' SNS 추가</button>' +
-      '<button class="btn soft sm" data-act="ai-open" data-tab="sns" style="margin-left:auto">' + icon('sparkle', 'sm') + ' 홍보글 만들기</button></div>';
+      '</div>';
   }
 
   function snsCard(e) {
@@ -1018,12 +1021,12 @@
 
   function viewSocial() {
     return '<div class="page-head"><div><h2>' + icon('share', 'lg') + ' SNS 연동</h2><p>기관 네이버 블로그 · 인스타그램을 연결하고, 필요한 SNS는 ‘SNS 추가하기’로 더 넣을 수 있어요.</p></div>' +
-      '<div class="toolbar"><button class="btn" data-act="sns-add">' + icon('plus') + '<span class="lbl">SNS 추가하기</span></button><button class="btn" data-act="add-link" data-cat="act">' + icon('link') + '<span class="lbl">게시물 가져오기</span></button><button class="btn accent" data-act="ai-open" data-tab="sns">' + icon('sparkle') + '<span class="lbl">홍보글 만들기</span></button></div></div>' +
+      '<div class="toolbar"><button class="btn" data-act="sns-add">' + icon('plus') + '<span class="lbl">SNS 추가하기</span></button><button class="btn" data-act="add-link" data-cat="act">' + icon('link') + '<span class="lbl">게시물 가져오기</span></button><button class="btn accent" data-act="ai-open" data-tab="image">' + icon('image') + '<span class="lbl">홍보 사진 만들기</span></button></div></div>' +
       '<div class="social-grid">' + snsList().map(snsCard).join('') +
       '<button class="card social-card social-add" data-act="sns-add">' + icon('plus', 'lg') + '<b>SNS 추가하기</b><small>유튜브 · 틱톡 · 페이스북 · 스레드 · X · 카카오톡 채널 · 밴드 · 기타</small></button></div>' +
       '<div class="card social-flow"><b>' + icon('heart', 'sm') + ' 이렇게 쓰면 편해요</b><ol>' +
-      '<li>활동을 기록하고 <b>마음기록 도우미 → SNS 홍보</b>로 블로그 글 · 인스타 캡션을 한 번에 만들어요.</li>' +
-      '<li><b>SNS로 공유</b>를 누르면 개인정보를 한 번 더 점검하고, 글을 복사한 뒤 블로그 글쓰기 · 인스타그램 화면을 열어 드려요. 휴대폰에서는 사진까지 앱으로 넘어가요.</li>' +
+      '<li>활동 기록이나 사진에서 <b>SNS로 공유</b>를 눌러요. 홍보용 이미지가 필요하면 <b>마음기록 도우미 → 사진 만들기</b>로 만들 수 있어요.</li>' +
+      '<li>공유 창에서 개인정보를 한 번 더 점검하고, 글을 복사한 뒤 블로그 글쓰기 · 인스타그램 화면을 열어 드려요. 휴대폰에서는 사진까지 앱으로 넘어가요.</li>' +
       '<li>올린 글 주소를 <b>게시물 가져오기</b>로 붙여 넣으면 ‘활동’ 폴더에 차곡차곡 쌓여요.</li></ol></div>';
   }
   function afterSocialRender() {}
@@ -1077,7 +1080,7 @@
       '<div class="share-grid">' + targets.map((e) => '<button class="share-btn" data-sh="' + e.id + '">' + snsBadge(e.type, 'sm') + '<b>' + esc(snsName(e)) + '</b><small>' + esc(e.handle ? e.handle : snsOn(e) ? '연결됨' : '복사 후 열기') + '</small></button>').join('') +
       (canNative ? '<button class="share-btn" data-sh="native">' + snsBadge('custom', 'sm') + '<b>휴대폰 앱으로</b><small>' + (canFiles ? '사진 + 글 함께' : '글 공유') + '</small></button>' : '') +
       '<button class="share-btn add" data-sh="add">' + icon('plus') + '<b>SNS 추가</b><small>다른 SNS 연결</small></button></div>',
-      foot: '<div class="left"><button class="btn ghost sm" data-sh="ai">' + icon('sparkle', 'sm') + ' 도우미로 홍보글 만들기</button></div><button class="btn ghost" data-close>닫기</button><button class="btn" data-sh="copy">' + icon('copy', 'sm') + ' 글만 복사</button>' });
+      foot: '<button class="btn ghost" data-close>닫기</button><button class="btn" data-sh="copy">' + icon('copy', 'sm') + ' 글만 복사</button>' });
     const $t = m.el.querySelector('#shText');
     const piiCheck = () => {
       const hits = PII.scan($t.value).filter((h) => !h.info);
@@ -1118,7 +1121,7 @@
       body: `<div class="meta-strip"><span>${icon('folder', 'sm')} ${esc(pathLabel(d))}</span>${d.kind === 'link' ? '' : `<span>${fmtSize(d.size)}</span>`}<span>수정 ${fmtDate(d.updatedAt)}</span>${tags ? `<span>${tags}</span>` : ''}</div><div id="pvArea" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:auto"><div class="no-preview"><div class="thinking"><i></i><i></i><i></i> 문서를 펼치는 중이에요…</div></div></div>`,
       foot: `<div class="left"><button class="btn ghost sm" data-pv="delete">${icon('trash', 'sm')} 삭제</button><button class="btn ghost sm" data-pv="move">${icon('move', 'sm')} 옮기기</button><button class="btn ghost sm" data-pv="meta">${icon('tag', 'sm')} 이름·태그</button></div>
         <button class="btn sm star-btn ${d.favorite ? 'on' : ''}" data-pv="star">${icon('star', 'sm')} ${d.favorite ? '고정됨' : '즐겨찾기'}</button>
-        ${canExtract(d) ? `<button class="btn sm" data-pv="ai">${icon('sparkle', 'sm')} 도우미 요약</button>` : ''}
+        
         <button class="btn sm" data-pv="download">${icon(d.kind === 'link' ? 'external' : 'download', 'sm')} ${d.kind === 'link' ? '새 탭에서 열기' : '내려받기'}</button>
         ${d.kind === 'note' || d.kind === 'link' || ftype(d).cls === 'img' ? `<button class="btn sm" data-pv="share">${icon('share', 'sm')} SNS 공유</button>` : ''}
         ${d.template ? `<button class="btn accent sm" data-pv="use">${icon('layout', 'sm')} 이 양식으로 작성</button>` : ''}
@@ -1195,8 +1198,65 @@
   function pickTemplate() {
     const tpls = S.docs.filter((d) => d.template);
     const m = openModal({ title: '어떤 양식으로 시작할까요?', sub: '고르면 바로 작성 화면이 열려요.', size: 'mid',
+      foot: `<button class="btn ghost" data-close>닫기</button><button class="btn primary" data-tplnew>${icon('plus', 'sm')} 양식 추가하기</button>`,
       body: `<div class="tool-grid">${tpls.map((d) => `<button class="tool-card" data-tpl="${d.id}"><span class="t-ico">${icon(d.tplIcon || 'fileText')}</span><span><b>${esc(d.name.replace(/^\[양식\]\s*/, ''))}</b><small>${esc(d.desc || pathLabel(d))}</small></span></button>`).join('')}</div>` });
     m.el.querySelector('.modal-body').addEventListener('click', (e) => { const b = e.target.closest('[data-tpl]'); if (b) { m.close(true); useTemplate(b.dataset.tpl); } });
+    m.el.querySelector('[data-tplnew]').onclick = () => { m.close(true); openTemplateMaker(); };
+  }
+
+  /* ---------- 양식 추가하기 (AI가 양식 생성) ---------- */
+  function openTemplateMaker() {
+    const cur = currentLoc();
+    const defF = topFolderByName('activity', '양식 모음');
+    const loc = cur || { cat: 'activity', folderId: defF ? defF.id : null };
+    const m = openModal({ title: '양식 추가하기', sub: '양식 종류와 특징을 적어 주시면 AI가 빈 양식을 만들어 드려요.', size: 'wide', bodyClass: 'tpl-maker-body', body: `
+      <div class="tpl-maker">
+        <div class="tpl-left">
+          <label class="field"><span>양식 종류</span><input class="input" id="tmKind" placeholder="예) 자원봉사자 활동 일지, 후원물품 접수증, 가정방문 체크리스트" maxlength="60" /></label>
+          <label class="field"><span>양식 특징 · 요청사항 (프롬프트)</span><textarea class="textarea" id="tmFeat" style="min-height:150px" placeholder="예) 봉사자 서명란과 담당자 확인란 넣어 줘. 활동시간 합계 칸, 안전교육 이수 체크박스 포함. A4 한 장 분량으로."></textarea></label>
+          <div class="seg" id="tmChips">${['서명·결재란 포함', '체크박스 위주', '표 형식으로', 'A4 한 장 분량', '개인정보 동의 문구 포함', '노인·장애인 등 대상자 맞춤'].map((c) => '<button type="button" data-chip="' + c + '">+ ' + c + '</button>').join('')}</div>
+          <label class="field" style="margin-top:14px"><span>보관할 위치</span><select class="select" id="tmLoc">${folderOptions(loc.cat, loc.folderId)}</select></label>
+          <button class="btn accent block" id="tmRun">${icon('sparkle', 'sm')} AI로 양식 만들기</button>
+          <p class="cell-muted" style="font-size:12px;margin:8px 0 0">만들어진 양식은 오른쪽에서 바로 고친 뒤 저장할 수 있어요.</p>
+        </div>
+        <div class="tpl-right">
+          <input class="editor-title" id="tmName" placeholder="[양식] 이름이 여기에 나타나요" maxlength="60" />
+          <input class="input" id="tmDesc" placeholder="한 줄 설명" maxlength="60" style="height:38px;font-size:13.5px" />
+          <textarea class="editor-text" id="tmBody" placeholder="왼쪽에 양식 종류와 특징을 적고 ‘AI로 양식 만들기’를 눌러 주세요."></textarea>
+        </div>
+      </div>`,
+      foot: `<button class="btn ghost" data-close>닫기</button><button class="btn primary" id="tmSave" disabled>${icon('save', 'sm')} 양식으로 저장</button>` });
+    const E = (id) => m.el.querySelector('#' + id);
+    let ctrl = null; let busy = false;
+    m.el.querySelector('#tmChips').addEventListener('click', (e) => { const b = e.target.closest('[data-chip]'); if (!b) return; const t = E('tmFeat'); t.value = (t.value.trim() ? t.value.trim() + ' ' : '') + b.dataset.chip + '.'; b.classList.add('on'); t.focus(); });
+    const syncSave = () => { E('tmSave').disabled = busy || !E('tmBody').value.trim(); };
+    E('tmBody').addEventListener('input', syncSave);
+    E('tmRun').onclick = async () => {
+      const kind = E('tmKind').value.trim(), feat = E('tmFeat').value.trim();
+      if (!kind && !feat) { toast('양식 종류나 특징을 먼저 적어 주세요.', { type: 'warn' }); E('tmKind').focus(); return; }
+      busy = true; syncSave();
+      E('tmRun').disabled = true; E('tmRun').innerHTML = '<span class="thinking" style="gap:6px"><i></i><i></i><i></i></span> 양식을 만들고 있어요…';
+      E('tmBody').value = '';
+      try {
+        const r = await MaeumAI.template({ kind, features: feat, onToken: (p, all) => { const sep = all.indexOf('---'); E('tmBody').value = sep >= 0 ? all.slice(sep + 3).replace(/^\s+/, '') : all; E('tmBody').scrollTop = E('tmBody').scrollHeight; } });
+        E('tmName').value = r.name; E('tmDesc').value = r.desc; E('tmBody').value = r.body;
+        toast('양식을 만들었어요. 확인하고 저장해 주세요.');
+      } catch (e) { toast(e.message || String(e), { type: 'warn', ms: 5000 }); }
+      busy = false; syncSave();
+      E('tmRun').disabled = false; E('tmRun').innerHTML = icon('refresh', 'sm') + ' 다시 만들기';
+    };
+    m.beforeClose = async () => !E('tmBody').value.trim() || m.saved || confirmBox('만든 양식을 저장하지 않았어요. 그래도 닫을까요?', { ok: '닫기', cancel: '계속 보기' });
+    E('tmSave').onclick = () => {
+      const body = E('tmBody').value.trim(); if (!body) return;
+      let name = E('tmName').value.trim() || '[양식] ' + (E('tmKind').value.trim() || '새 양식');
+      if (!/^\[양식\]/.test(name)) name = '[양식] ' + name;
+      const l = parseLoc(E('tmLoc').value);
+      const d = { id: uid('d'), kind: 'note', name, ext: 'txt', mime: 'text/plain', content: body, size: new Blob([body]).size, cat: l.cat, folderId: l.folderId, tags: ['양식', 'AI생성'], favorite: true, template: true, tplIcon: 'sparkle', desc: E('tmDesc').value.trim() || (E('tmKind').value.trim() + ' 양식'), createdAt: now(), updatedAt: now() };
+      S.docs.push(d); save(); m.saved = true; m.close(true);
+      if (route.view === 'templates') renderAll(); else go({ view: 'templates' });
+      toast('양식 템플릿에 추가했어요.', { action: { label: '이 양식으로 작성', fn: () => useTemplate(d.id) } });
+    };
+    setTimeout(() => E('tmKind').focus(), 50);
   }
 
   function openEditor({ doc = null, preset = {} } = {}) {
@@ -1216,12 +1276,7 @@
         <div class="editor-side">
           <h5>양식 불러오기</h5>
           <select class="select" id="edTpl" style="height:38px;font-size:13px;margin-bottom:16px"><option value="">양식 선택…</option>${tpls.map((t) => `<option value="${t.id}">${esc(t.name.replace(/^\[양식\]\s*/, ''))}</option>`).join('')}</select>
-          <h5>마음기록 도우미에게 맡기기</h5>
-          <button class="side-tool" data-ed="memo">${icon('chat', 'sm')} 상담 일지로 정리</button>
-          <button class="side-tool" data-ed="polish">${icon('wand', 'sm')} 문장 다듬기</button>
-          <button class="side-tool" data-ed="summary">${icon('listChecks', 'sm')} 핵심 요약</button>
-          <button class="side-tool" data-ed="privacy">${icon('shield', 'sm')} 개인정보 점검</button>
-          <h5 style="margin-top:16px">내보내기</h5>
+          <h5>내보내기</h5>
           <button class="side-tool" data-ed="doc">${icon('fileText', 'sm')} 한글·워드용 (.doc)</button>
           <button class="side-tool" data-ed="txt">${icon('file', 'sm')} 텍스트 (.txt)</button>
           <button class="side-tool" data-ed="print">${icon('printer', 'sm')} 인쇄 / PDF</button>
@@ -1376,15 +1431,14 @@
    * 11. 마음기록 도우미 패널
    * ========================================================= */
   const AI_TABS = [
-    { id: 'memo', label: '메모 정리', icon: 'chat' },
-    { id: 'report', label: '보고서', icon: 'chart' },
-    { id: 'summary', label: '요약', icon: 'listChecks' },
-    { id: 'privacy', label: '개인정보', icon: 'shield' },
-    { id: 'sns', label: 'SNS 홍보', icon: 'share' },
-    { id: 'chat', label: '대화', icon: 'heart' },
+    { id: 'search', label: '검색해서 알려줘', icon: 'search' },
+    { id: 'image', label: '사진 만들기', icon: 'image' },
   ];
   const AIS = {};
-  AI_TABS.forEach((t) => (AIS[t.id] = { fields: {}, result: '', status: 'idle', error: '', ctrl: null }));
+  ['search', 'image', 'memo', 'report', 'summary', 'privacy', 'sns', 'chat'].forEach((id) => (AIS[id] = { fields: {}, result: '', status: 'idle', error: '', ctrl: null }));
+  AIS.search.history = [];
+  AIS.image.fields = { style: '따뜻한 일러스트', ratio: '1:1' };
+  AIS.image.items = [];
   AIS.memo.fields = { date: todayStr(), type: '초기상담' };
   AIS.summary.fields = { style: 'brief' };
   AIS.privacy.fields = { mask: 'alias' };
@@ -1421,7 +1475,7 @@
         <button class="icon-btn sm" data-act="ai-close" aria-label="도우미 닫기">${icon('x')}</button></div>
       <div class="ai-tabs" role="tablist">${AI_TABS.map((t) => `<button class="ai-tab ${ui.aiTab === t.id ? 'on' : ''}" role="tab" data-act="ai-tab" data-tab="${t.id}">${icon(t.icon, 'sm')}${t.label}</button>`).join('')}</div>
       <div class="ai-body" id="aiBody">${aiTabBody(ui.aiTab)}</div>
-      <div class="ai-foot"><span>AI가 만든 초안이에요. 사실 여부를 꼭 확인해 주세요.</span><span id="aiUsage">${usage}</span></div>`;
+      <div class="ai-foot"><span>AI 답변과 이미지는 꼭 확인한 뒤 사용해 주세요.</span><span id="aiUsage">${usage}</span></div>`;
     updateAIInsertButtons();
   }
   function renderAIBody() { if (!ui.aiOpen) return; const b = $('#aiBody'); if (!b) return; const y = b.scrollTop; b.innerHTML = aiTabBody(ui.aiTab); b.scrollTop = y; updateAIInsertButtons(); const u = $('#aiUsage'); if (u && engineStatus().mode === 'builtin') u.textContent = `오늘 ${MaeumAI.usage()}/${MaeumAI.dailyCap}회 사용`; }
@@ -1433,7 +1487,90 @@
     return `<div class="load-doc"><select class="select" data-change="ai-load" data-target="${target}" aria-label="보관함 문서 불러오기"><option value="">보관함 문서에서 불러오기…</option>${docs.map((d) => `<option value="${d.id}">${esc(d.name)} · ${esc(CATS[d.cat].name)}</option>`).join('')}</select></div>`;
   }
 
+  /* ---------- 검색해서 알려줘 ---------- */
+  function citeLinks(html, sources) {
+    if (!sources || !sources.length) return html;
+    return html.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (m, nums) => nums.split(/\s*,\s*/).map((n) => { const s = sources[+n - 1]; return s ? '<a class="cite" href="' + esc(s.uri) + '" target="_blank" rel="noopener" title="' + esc(s.title) + '">' + n + '</a>' : ''; }).join(''));
+  }
+  const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return u; } };
+  function searchBody() {
+    const h = AIS.search.history;
+    const busy = AIS.search.status === 'loading';
+    const intro = h.length ? '' : '<div class="ai-intro"><b>궁금한 걸 편하게 물어보세요.</b> 인터넷에서 찾아 읽어 본 뒤, 출처 번호와 함께 알려 드려요. 제도·일정·금액은 공식 사이트를 먼저 살펴요.</div>' +
+      '<div class="suggests">' + ['2027년 사회복지사 1급 시험 일정 알려줘', '올해 사회복지시설 인건비 가이드라인 바뀐 점', '노인맞춤돌봄서비스 대상 기준이 뭐야?', '사회복지사 보수교육 면제·유예 조건'].map((q) => '<button data-act="search-suggest" data-q="' + esc(q) + '">' + esc(q) + '</button>').join('') + '</div>';
+    const thread = h.map((m, i) => {
+      if (m.role === 'user') return '<div class="bubble me">' + esc(m.content) + '</div>';
+      const body = m.content ? citeLinks(md(m.content), m.sources || []) : '<div class="thinking"><i></i><i></i><i></i> ' + esc(m.status || '인터넷에서 찾고 있어요…') + '</div>';
+      const src = !m.streaming && m.sources && m.sources.length ? '<div class="sources"><b>' + icon('search', 'sm') + ' 찾아본 자료</b>' + m.sources.map((s, k) => '<a href="' + esc(s.uri) + '" target="_blank" rel="noopener"><span class="n">' + (k + 1) + '</span><span class="t">' + esc(s.title) + '</span><span class="d">' + esc(hostOf(s.uri)) + '</span></a>').join('') + '</div>' : '';
+      const note = !m.streaming && m.content && m.searched === false ? '<div class="cell-muted" style="font-size:12px;margin-top:8px">인터넷 검색 결과를 가져오지 못해 알고 있는 범위에서 답했어요. 공식 사이트에서 한 번 더 확인해 주세요.</div>' : '';
+      const tools = !m.streaming && m.content ? '<div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap"><button class="btn ghost sm" data-act="search-copy" data-i="' + i + '">' + icon('copy', 'sm') + ' 복사</button><button class="btn ghost sm" data-act="search-save" data-i="' + i + '">' + icon('save', 'sm') + ' 문서로 저장</button></div>' : '';
+      return '<div class="bubble ai"><div class="md' + (m.streaming && m.content ? ' typing' : '') + '"' + (m.streaming ? ' id="searchStream"' : '') + '>' + body + '</div>' + note + src + tools + (m.error ? '<div class="err-box">' + esc(m.error) + '</div>' : '') + '</div>';
+    }).join('');
+    return intro + '<div class="chat">' + thread + '</div>' +
+      '<form class="chat-input" data-submit="search-send"><textarea class="textarea" name="q" rows="1" placeholder="무엇이든 물어보세요. 인터넷에서 찾아 드릴게요" data-f="draft">' + fv('search', 'draft') + '</textarea>' +
+      (busy ? '<button class="btn" type="button" disabled>' + icon('search', 'sm') + '</button>' : '<button class="btn accent" type="submit" aria-label="검색해서 묻기">' + icon('send', 'sm') + '</button>') + '</form>' +
+      (h.length && !busy ? '<div style="text-align:center;margin-top:8px"><button class="btn ghost sm" data-act="search-clear">' + icon('refresh', 'sm') + ' 새 질문 시작</button></div>' : '');
+  }
+  async function runSearch(q) {
+    q = String(q || '').trim(); if (!q) return;
+    const st = AIS.search; if (st.status === 'loading') return;
+    const history = [];
+    st.history.filter((m) => m.content && !m.error).slice(-6).forEach((m) => history.push({ role: m.role, content: m.content }));
+    st.history.push({ role: 'user', content: q });
+    const msg = { role: 'assistant', content: '', streaming: true, status: '인터넷에서 찾고 있어요…', sources: [] };
+    st.history.push(msg); st.fields.draft = ''; st.status = 'loading';
+    renderAIBody(); const b = $('#aiBody'); b && (b.scrollTop = b.scrollHeight);
+    try {
+      const r = await MaeumAI.search({ question: q, history, onStatus: (t) => { msg.status = t; if (!msg.content) renderAIBody(); }, onToken: (p, all) => { msg.content = all; paintStream('search'); } });
+      msg.content = r.text; msg.sources = r.sources; msg.searched = r.searched;
+    } catch (e) { msg.error = e.message || String(e); }
+    msg.streaming = false; st.status = 'idle';
+    if (!msg.content && !msg.error) msg.error = '답을 받지 못했어요. 다시 물어봐 주세요.';
+    renderAIBody(); const b2 = $('#aiBody'); b2 && (b2.scrollTop = b2.scrollHeight);
+  }
+  const searchPlain = (m) => plainForSave(m.content) + (m.sources && m.sources.length ? '\n\n[출처]\n' + m.sources.map((s, k) => (k + 1) + '. ' + s.title + ' - ' + s.uri).join('\n') : '');
+
+  /* ---------- 사진 만들기 ---------- */
+  function imageBody() {
+    const st = AIS.image; const busy = st.status === 'loading';
+    const items = st.items.map((it, i) => '<div class="img-card"><img src="' + it.url + '" alt="' + esc(it.prompt) + '" /><p>' + esc(it.prompt) + '</p><div class="img-acts"><button class="btn ghost sm" data-act="img-dl" data-i="' + i + '">' + icon('download', 'sm') + ' 내려받기</button><button class="btn ghost sm" data-act="img-save" data-i="' + i + '">' + icon('save', 'sm') + ' 보관함에 저장</button><button class="btn ghost sm" data-act="img-share" data-i="' + i + '">' + icon('share', 'sm') + ' SNS로 공유</button></div></div>').join('');
+    return '<div class="ai-intro"><b>어떤 사진이 필요한지 적어 주세요.</b> 홍보물 · 블로그 · 인스타그램에 쓸 이미지를 만들어 드려요. 한국어로 편하게 적으면 돼요.</div>' +
+      '<label class="field"><span>만들고 싶은 장면</span><textarea class="textarea" data-f="prompt" style="min-height:110px" placeholder="예) 복지관 프로그램실에서 어르신들이 허브 화분을 가꾸며 웃는 장면">' + fv('image', 'prompt') + '</textarea></label>' +
+      '<div class="field"><span>스타일</span>' + seg('image', 'style', [['실제 사진처럼, 자연광', '사진처럼'], ['따뜻한 일러스트', '일러스트'], ['부드러운 수채화', '수채화'], ['깔끔한 홍보 포스터 디자인', '포스터']]) + '</div>' +
+      '<div class="field"><span>비율</span>' + seg('image', 'ratio', [['1:1', '정사각 1:1'], ['16:9', '가로 16:9'], ['3:4', '세로 3:4'], ['9:16', '스토리 9:16']]) + '</div>' +
+      '<div class="ai-actions">' + (busy ? '<button class="btn" disabled><span class="thinking" style="gap:6px"><i></i><i></i><i></i></span> 그리는 중…</button>' : '<button class="btn accent" data-act="img-run">' + icon('image', 'sm') + ' 사진 만들기</button>') + '<span class="cell-muted" style="font-size:12px">보통 10~40초 걸려요</span></div>' +
+      (st.error ? '<div class="err-box">' + esc(st.error) + '</div>' : '') +
+      '<div class="img-list">' + (busy ? '<div class="img-card loading"><div class="thinking"><i></i><i></i><i></i> 사진을 그리고 있어요…</div></div>' : '') + items + '</div>' +
+      '<p class="social-note" style="margin-top:14px">무료 이미지 생성 서비스를 써서 사진 오른쪽 아래에 작은 표시가 들어가요. 실제 인물·현장 사진으로 오해되지 않도록 게시할 때 ‘AI로 만든 이미지’라고 밝혀 주세요.</p>';
+  }
+  async function runImage() {
+    const st = AIS.image; const prompt = String(st.fields.prompt || '').trim();
+    if (!prompt) { toast('만들고 싶은 장면을 먼저 적어 주세요.', { type: 'warn' }); const el = $('#aiBody [data-f="prompt"]'); el && el.focus(); return; }
+    if (st.status === 'loading') return;
+    st.status = 'loading'; st.error = ''; renderAIBody();
+    try {
+      const r = await MaeumAI.image({ prompt, style: st.fields.style, ratio: st.fields.ratio });
+      st.items.unshift({ blob: r.blob, url: URL.createObjectURL(r.blob), prompt, at: now() });
+    } catch (e) { st.error = e.message || String(e); }
+    st.status = 'idle'; renderAIBody();
+  }
+  async function saveImageItem(i, thenShare) {
+    const it = AIS.image.items[i]; if (!it) return null;
+    const f = topFolderByName('act', 'SNS 홍보') || topFolderByName('act', '현장 활동 소식');
+    const loc = thenShare ? { cat: 'act', folderId: f ? f.id : null } : await pickFolder('사진 보관하기', { cat: 'act', folderId: f ? f.id : null, sub: '어느 폴더에 넣어 둘까요?' });
+    if (!loc) return null;
+    if (it.docId && docById(it.docId)) return it.docId;
+    const ext = (it.blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+    const d = { id: uid('d'), kind: 'file', name: 'AI사진_' + dotDate() + '_' + String(AIS.image.items.length - i).padStart(2, '0') + '.' + ext, ext, mime: it.blob.type, size: it.blob.size, cat: loc.cat, folderId: loc.folderId, tags: ['AI이미지'], favorite: false, template: false, desc: it.prompt, createdAt: now(), updatedAt: now() };
+    await Store.putBlob(d.id, it.blob); S.docs.push(d); save(); renderSidebar(); if (route.view === 'folder') renderMain();
+    it.docId = d.id;
+    if (!thenShare) toast('보관함에 저장했어요.', { action: { label: '열어 보기', fn: () => openPreview(d.id) } });
+    return d.id;
+  }
+
   function aiTabBody(tab) {
+    if (tab === 'search') return searchBody();
+    if (tab === 'image') return imageBody();
     const st = AIS[tab];
     const running = st.status === 'loading' || st.status === 'streaming';
     const runBtn = (label) => running
@@ -1545,7 +1682,8 @@
     streamRaf = requestAnimationFrame(() => {
       streamRaf = 0;
       if (!ui.aiOpen || ui.aiTab !== tab) return;
-      if (tab === 'chat') { const el = $('#chatStream'); const last = AIS.chat.history[AIS.chat.history.length - 1]; if (el && last) el.innerHTML = md(last.content); }
+      if (tab === 'search') { const el = $('#searchStream'); const last = AIS.search.history[AIS.search.history.length - 1]; if (el && last) el.innerHTML = citeLinks(md(last.content), last.sources || []); }
+      else if (tab === 'chat') { const el = $('#chatStream'); const last = AIS.chat.history[AIS.chat.history.length - 1]; if (el && last) el.innerHTML = md(last.content); }
       else { const el = $(`#aiResult-${tab} .result-body`); if (el) el.innerHTML = md(AIS[tab].result); }
       const b = $('#aiBody'); if (b && b.scrollHeight - b.scrollTop - b.clientHeight < 160) b.scrollTop = b.scrollHeight;
     });
@@ -1856,6 +1994,15 @@
       if (innerWidth < 1100) closeAI();
     },
     'ai-share': (el) => openShare({ text: plainForSave(AIS[el.dataset.tab].result), title: AIS[el.dataset.tab].fields.title || '' }),
+    'search-suggest': (el) => runSearch(el.dataset.q),
+    'search-copy': (el) => copyText(searchPlain(AIS.search.history[+el.dataset.i])),
+    'search-save': (el) => { const m = AIS.search.history[+el.dataset.i]; const q = AIS.search.history[+el.dataset.i - 1]; const f = topFolderByName('info', '유용한 사이트'); saveAIText(searchPlain(m), { name: '검색 정리_' + (q ? q.content.slice(0, 30) : dotDate()), cat: 'info', folderId: f ? f.id : null, tags: ['검색', '정보'] }); },
+    'search-clear': () => { AIS.search.history = []; renderAIBody(); },
+    'img-run': () => runImage(),
+    'img-dl': (el) => { const it = AIS.image.items[+el.dataset.i]; if (it) downloadBlob(it.blob, 'AI사진_' + dotDate() + '.' + ((it.blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg'))); },
+    'img-save': (el) => saveImageItem(+el.dataset.i, false),
+    'img-share': async (el) => { const id = await saveImageItem(+el.dataset.i, true); if (id) openShare({ docId: id, title: 'AI 이미지' }); },
+    'tpl-new': () => openTemplateMaker(),
     'pii-scan': () => quickScanPII(),
     'pii-mask': () => maskPII(),
     'chat-suggest': (el) => chatSend(el.dataset.q),
@@ -1930,6 +2077,7 @@
       setTimeout(() => { const i = $(`[data-cl="${c.id}"] input[name=t]`); i && i.focus(); }, 20);
     }
     if (f.dataset.submit === 'chat-send') chatSend(f.q.value);
+    if (f.dataset.submit === 'search-send') runSearch(f.q.value);
     if (f.dataset.submit === 'social-connect') socialConnect(f.dataset.id, f.v.value);
   });
   // 도우미 입력값 보존
@@ -1939,7 +2087,8 @@
     if (ui.aiTab === 'privacy' && k === 'text') AIS.privacy.local = null;
   });
   $('#aiPanel').addEventListener('keydown', (e) => {
-    if (e.target.name === 'q' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); chatSend(e.target.value); }
+    if (e.target.name === 'q' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (ui.aiTab === 'search') runSearch(e.target.value); else chatSend(e.target.value); }
+    if (e.target.dataset.f === 'prompt' && ui.aiTab === 'image' && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runImage(); }
   });
 
   // 검색
@@ -1997,7 +2146,7 @@
       <p class="auth-sub">사회복지사를 위한 따뜻한 서류함 &amp; 업무 비서</p>
       <ul class="auth-feats">
         <li>${icon('folder', 'sm')} 일반·활동 서류를 폴더로 차곡차곡</li>
-        <li>${icon('sparkle', 'sm')} 마음기록 도우미가 상담 일지·보고서 초안을 함께</li>
+        <li>${icon('sparkle', 'sm')} 마음기록 도우미가 인터넷 검색 답변과 홍보용 사진을</li>
         <li>${icon('heart', 'sm')} 교육 · 정보 · 활동 라운지와 네이버 블로그 · 인스타그램 연동</li>
       </ul>
       <button class="g-btn" id="gSignIn">${G_LOGO}<span>Google로 3초 만에 시작하기</span></button>
