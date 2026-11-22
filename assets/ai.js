@@ -136,6 +136,41 @@ ${f.text}
 
 ${f.text}`,
     },
+    sns: {
+      name: 'SNS 홍보글',
+      build: (f) => {
+        const want = f.platform || 'all';
+        const parts = [];
+        if (want === 'all' || want === 'instagram') parts.push(`## 인스타그램 게시글
+- 첫 줄: 스크롤을 멈추게 하는 한 문장
+- 본문: 300~600자, 짧은 문단과 줄바꿈, 이모지는 2~4개만
+- 해시태그: 10~15개 (#사회복지 포함, 지역·활동 태그)`);
+        if (want === 'all' || want === 'tiktok') parts.push(`## 틱톡·쇼츠 영상 대본 (15~30초)
+- 표: 장면(초) / 화면 / 자막 / 내레이션
+- 끝에 영상 설명 한 줄 + 해시태그 5개`);
+        if (want === 'all' || want === 'youtube') parts.push(`## 유튜브 제목·설명
+- 제목 후보 3개 (40자 이내)
+- 설명 3~5줄 + 태그 8개`);
+        return `아래 복지관 활동을 SNS에 올릴 홍보 콘텐츠로 만들어 주세요.
+
+- 활동명: ${f.title || '[확인 필요]'}
+- 활동 내용: ${f.text || '[확인 필요]'}
+- 분위기: ${f.tone || '따뜻하고 다정하게'}
+- 기관·계정명: ${f.org || '(없음)'}
+
+[원칙]
+- 실명·연락처·주소·학교명 등 개인정보를 쓰지 말고 '참여자', '어르신' 등으로 표현합니다.
+- 동정을 유발하는 시혜적 표현 대신 참여자의 강점과 주체성을 보여 줍니다.
+- 입력에 없는 수치나 사실은 만들지 않습니다.
+- 게시글 본문은 SNS 말투(부드러운 해요체)로 씁니다.
+
+[작성 형식]
+${parts.join('\n\n')}
+
+## 게시 전 확인
+- 촬영·게시 동의, 얼굴·실명 노출, 위치 정보 등 2~3줄`;
+      },
+    },
     chat: { name: '자유 대화', build: (f) => f.text },
   };
 
@@ -221,7 +256,7 @@ ${f.text}`,
         import(`https://www.gstatic.com/firebasejs/${C.sdk}/firebase-app.js`),
         import(`https://www.gstatic.com/firebasejs/${C.sdk}/firebase-app-check.js`),
       ]);
-      const app = getApps()[0] || initializeApp({ apiKey: C.apiKey, projectId: C.projectId, appId: C.appId, authDomain: C.authDomain });
+      const app = getApps().find((a) => a.name === 'darkcode') || initializeApp({ apiKey: C.apiKey, projectId: C.projectId, appId: C.appId, authDomain: C.authDomain }, 'darkcode');
       const inst = ac.initializeAppCheck(app, { provider: new ac.ReCaptchaEnterpriseProvider(C.recaptchaSiteKey), isTokenAutoRefreshEnabled: true });
       appCheckGetter = async () => (await ac.getToken(inst, false)).token;
     }

@@ -6,7 +6,8 @@
  * 추후 서버 DB로 바꿀 때는 이 파일의 Store 인터페이스(get/put/del)만 교체하면 됩니다.
  */
 const Store = (() => {
-  const DB_NAME = 'maeum-drawer';
+  const LEGACY = 'maeum-drawer';
+  let DB_NAME = LEGACY;
   const DB_VER = 1;
   let dbp = null;
   const mem = { kv: new Map(), blobs: new Map(), vault: new Map() };
@@ -21,6 +22,7 @@ const Store = (() => {
       setTimeout(() => { if (!settled) { memoryOnly = true; finish(null); } }, 4000);
       try {
         const req = indexedDB.open(DB_NAME, DB_VER);
+        req.onblocked = () => {};
         req.onupgradeneeded = () => {
           const db = req.result;
           ['kv', 'blobs', 'vault'].forEach((s) => { if (!db.objectStoreNames.contains(s)) db.createObjectStore(s); });
@@ -109,8 +111,32 @@ const Store = (() => {
     del: (name) => del('vault', name),
   };
 
+  /* 사용자별 저장소 전환 (Google 로그인 uid 기준) */
+  function use(name) { DB_NAME = name; dbp = null; memoryOnly = false; }
+  // 로그인 기능 이전에 쓰던 저장소(maeum-drawer)가 있으면 처음 로그인한 계정으로 옮겨 줍니다.
+  async function migrateLegacy() {
+    if (DB_NAME === LEGACY || !indexedDB.databases) return false;
+    try {
+      const list = await indexedDB.databases();
+      if (!list.some((d) => d.name === LEGACY)) return false;
+      if (localStorage.getItem('maeum.legacyMoved')) return false;
+      const old = await new Promise((res) => { const r = indexedDB.open(LEGACY, DB_VER); r.onupgradeneeded = () => { ['kv', 'blobs', 'vault'].forEach((s) => { if (!r.result.objectStoreNames.contains(s)) r.result.createObjectStore(s); }); }; r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
+      if (!old) return false;
+      const readAll = (s) => new Promise((res) => { const out = []; const t = old.transaction(s, 'readonly'); const c = t.objectStore(s).openCursor(); c.onsuccess = () => { const cur = c.result; if (cur) { out.push([cur.key, cur.value]); cur.continue(); } else res(out); }; c.onerror = () => res(out); });
+      const kv = await readAll('kv');
+      if (!kv.some(([k]) => k === 'state')) { old.close(); return false; }
+      const blobs = await readAll('blobs'); const vault = await readAll('vault');
+      old.close();
+      for (const [k, v] of kv) await put('kv', k, v);
+      for (const [k, v] of blobs) await put('blobs', k, v);
+      for (const [k, v] of vault) await put('vault', k, v);
+      localStorage.setItem('maeum.legacyMoved', DB_NAME);
+      return true;
+    } catch (e) { console.warn('legacy migrate', e); return false; }
+  }
+
   return {
-    open, get, put, del, clearAll, Vault,
+    open, get, put, del, clearAll, Vault, use, migrateLegacy,
     get memoryOnly() { return memoryOnly; },
     loadState: () => get('kv', 'state'),
     saveState: (s) => put('kv', 'state', s),
