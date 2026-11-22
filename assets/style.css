@@ -557,7 +557,7 @@ body.ai-open .ai-panel { transform: none; visibility: visible; }
 .yt-thumb span { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; opacity: 0; background: rgba(0,0,0,.25); transition: opacity .15s; }
 .yt-thumb:hover span { opacity: 1; }
 .social-flow { padding: 18px 20px; margin-top: 18px; }
-.social-flow b { display: flex; align-items: center; gap: 6px; }
+.social-flow > b { display: flex; align-items: center; gap: 6px; }
 .social-flow ol { margin: 10px 0 0; padding-left: 20px; color: #4F5558; font-size: 14px; }
 .social-flow li { margin: 4px 0; }
 .share-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
