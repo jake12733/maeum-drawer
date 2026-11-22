@@ -593,6 +593,27 @@ body.ai-open .ai-panel { transform: none; visibility: visible; }
 .auth-hint { display: block; color: var(--muted); font-size: 12.5px; margin-top: 10px; }
 .auth-err { color: var(--danger); font-size: 13px; min-height: 18px; margin: 10px 0 0; }
 .auth-foot { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--faint); display: flex; gap: 6px; align-items: flex-start; justify-content: center; text-align: left; }
+.ftype.nv { background: #E6F8EE; color: #03A84E; font-size: 15px; }
+.sns-badge { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+.sns-badge b { font-size: 18px; font-weight: 900; font-family: Arial, sans-serif; }
+.sns-badge.lg { width: 48px; height: 48px; border-radius: 50%; }
+.sns-badge.sm { width: 30px; height: 30px; border-radius: 9px; }
+.sns-badge.sm b { font-size: 14px; } .sns-badge.sm svg { width: 16px; height: 16px; }
+.sns-badge.xs { width: 20px; height: 20px; border-radius: 6px; }
+.sns-badge.xs b { font-size: 11px; } .sns-badge.xs svg { width: 12px; height: 12px; }
+.sns-chip.on { border-color: #CFE0D3; color: var(--primary-dark); background: var(--primary-softer); }
+.social-head .icon-btn { margin-left: 2px; }
+.social-add { border: 1.5px dashed var(--line-2); background: transparent; box-shadow: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 150px; color: var(--muted); text-align: center; }
+.social-add b { font-size: 15px; color: var(--text); }
+.social-add small { font-size: 12.5px; }
+.social-add:hover { border-color: var(--primary-2); background: var(--primary-softer); color: var(--primary-dark); }
+.sns-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.sns-pick-btn { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 9px 10px; font-size: 13.5px; font-weight: 600; text-align: left; }
+.sns-pick-btn .sns-badge { width: 30px; height: 30px; border-radius: 9px; }
+.sns-pick-btn .sns-badge b { font-size: 14px; } .sns-pick-btn .sns-badge svg { width: 16px; height: 16px; }
+.sns-pick-btn.on { border-color: var(--primary-2); background: var(--primary-softer); box-shadow: 0 0 0 3px rgba(91,138,114,.12); }
+.share-btn.add { border-style: dashed; color: var(--muted); }
+.share-btn.add svg { color: var(--primary); }
 @media (max-width: 1100px) { .lounge-grid { grid-template-columns: 1fr; } }
 @media (max-width: 640px) {
   .user-chip { width: 40px; height: 40px; }

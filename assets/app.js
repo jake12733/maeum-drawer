@@ -139,6 +139,20 @@
     addLounge(st);
     return st;
   }
+  // 데모·예시 자료 정리 (2026-11-22 요청)
+  function cleanDemo(st) {
+    if (st.demoCleaned) return;
+    const demoNames = ['개인정보 보호 업무 체크 (예시)', '초기상담_대상자A (예시)', '활동 소식 작성 예시 (원예교실)'];
+    st.docs = st.docs.filter((d) => !(d.kind === 'note' && demoNames.includes(d.name)));
+    const cl = st.checklists.find((c) => c.title === '신규 사례관리 대상자 접수');
+    if (cl && cl.items.length === 5 && cl.items[0].done && cl.items[1].done && !cl.items.slice(2).some((i) => i.done)) cl.items.forEach((i) => (i.done = false));
+    st.docs.forEach((d) => {
+      if (d.kind !== 'note' || !d.content) return;
+      if (d.tplId === 'tpl-sns-post') d.content = d.content.replace('■ 플랫폼 : □ 인스타그램  □ 틱톡  □ 유튜브(쇼츠)', '■ 플랫폼 : □ 네이버 블로그  □ 인스타그램  □ 기타(        )');
+      if (d.name === 'SNS 홍보 전 체크리스트') d.content = d.content.replace('인스타그램·틱톡·유튜브에 활동을 올리기 전에', '네이버 블로그·인스타그램 등 SNS에 활동을 올리기 전에');
+    });
+    st.demoCleaned = true;
+  }
   function addLounge(st) {
     if (st.seedLounge || typeof LOUNGE === 'undefined') return;
     const t0 = now() - 1000 * 60 * 60 * 3;
@@ -154,7 +168,12 @@
     st.settings = Object.assign({ userName: '', pinHash: '', pinSalt: '', autoLockMin: 0 }, st.settings || {});
     st.docs.forEach((d) => { d.tags ||= []; d.folderId ??= null; });
     st.social ||= {};
+    if (!Array.isArray(st.social.list)) {
+      const oldIg = typeof st.social.instagram === 'string' ? st.social.instagram : '';
+      st.social = { list: [{ id: 'naver', type: 'naver', fixed: true }, { id: 'instagram', type: 'instagram', fixed: true, ...(oldIg ? { handle: oldIg } : {}) }] };
+    }
     addLounge(st);
+    cleanDemo(st);
     return st;
   }
 
@@ -173,7 +192,7 @@
   const extOf = (name) => { const m = /\.([a-z0-9]{1,6})$/i.exec(name || ''); return m ? m[1].toLowerCase() : ''; };
   function ftype(d) {
     if (d.kind === 'note') return { cls: 'note', label: '' };
-    if (d.kind === 'link') return { cls: { youtube: 'yt', instagram: 'ig', tiktok: 'tt' }[d.platform] || 'web', label: '', icon: { youtube: 'youtube', instagram: 'instagram', tiktok: 'tiktok' }[d.platform] || 'link' };
+    if (d.kind === 'link') return { cls: { youtube: 'yt', instagram: 'ig', tiktok: 'tt', naver: 'nv' }[d.platform] || 'web', label: d.platform === 'naver' ? 'N' : '', icon: { youtube: 'youtube', instagram: 'instagram', tiktok: 'tiktok' }[d.platform] || 'link' };
     const e = d.ext || extOf(d.name);
     if (e === 'pdf') return { cls: 'pdf', label: 'PDF' };
     if (['hwp', 'hwpx'].includes(e)) return { cls: 'hwp', label: 'HWP' };
@@ -490,7 +509,7 @@
       <div class="lounge-grid">
         ${card('edu', dd != null ? `<button class="dday" data-act="go-folder" data-cat="edu">${icon('calendar', 'sm')} 사회복지사 1급 시험 <b>D-${dd}</b> <span>2027.1.16(토)</span></button>` : '')}
         ${card('info', '<div class="mini-note">2026 인건비 가이드라인: 기본급 3.5% 인상 · 유급병가 신설</div>')}
-        ${card('act', `<button class="dday sns" data-act="go" data-view="social">${icon('share', 'sm')} ${sc ? `SNS ${sc}곳 연결됨` : '인스타 · 틱톡 · 유튜브 연결하기'}</button>`)}
+        ${card('act', `<button class="dday sns" data-act="go" data-view="social">${icon('share', 'sm')} ${sc ? `SNS ${sc}곳 연결됨` : '네이버 블로그 · 인스타그램 연결하기'}</button>`)}
       </div></section>`;
   }
 
@@ -848,6 +867,7 @@
     youtube: { name: '유튜브', icon: 'youtube', color: '#E5372E' },
     instagram: { name: '인스타그램', icon: 'instagram', color: '#D62976' },
     tiktok: { name: '틱톡', icon: 'tiktok', color: '#111' },
+    naver: { name: '네이버 블로그', icon: 'link', color: '#03C75A' },
     web: { name: '웹 링크', icon: 'link', color: '#3A6EA5' },
   };
   function parseSocial(raw) {
@@ -860,6 +880,7 @@
       if (v) return { platform: 'youtube', id: v, url: u.href, embed: `https://www.youtube-nocookie.com/embed/${v}`, ratio: /shorts/.test(u.pathname) ? '9/16' : '16/9' };
       return { platform: 'youtube', url: u.href, channel: true };
     }
+    if (/(^|\.)blog\.naver\.com$/.test(h)) return { platform: 'naver', url: u.href, profile: !/\/\d{6,}/.test(u.pathname + u.search) };
     if (/(^|\.)instagram\.com$/.test(h)) {
       if ((m = /^\/(p|reel|reels|tv)\/([\w-]+)/.exec(u.pathname))) { const t = m[1] === 'reels' ? 'reel' : m[1]; return { platform: 'instagram', id: m[2], url: `https://www.instagram.com/${t}/${m[2]}/`, embed: `https://www.instagram.com/${t}/${m[2]}/embed/captioned/`, ratio: '4/5.6' }; }
       return { platform: 'instagram', url: u.href, profile: true };
@@ -871,7 +892,6 @@
     return { platform: 'web', url: u.href };
   }
   const platformLabel = (d) => { const p = PLAT[d.platform] || PLAT.web; let host = ''; try { host = new URL(d.url).hostname.replace(/^www\./, ''); } catch (e) {} return d.platform && d.platform !== 'web' ? `${p.name} 게시물` : host || '웹 링크'; };
-  const socialCount = () => { const s = (S && S.social) || {}; return ['instagram', 'tiktok'].filter((k) => s[k]).length + (s.youtube && s.youtube.channelId ? 1 : 0); };
   const openExternal = (url) => window.open(url, '_blank', 'noopener,noreferrer');
 
   async function ytApi(path, params) {
@@ -935,75 +955,110 @@
     };
   }
 
+  /* ---------- SNS 계정 (기본: 네이버 블로그 · 인스타그램 / 'SNS 추가하기'로 확장) ---------- */
+  const SNS_TYPES = {
+    naver: { name: '네이버 블로그', badge: 'N', color: '#03C75A', ph: '블로그 아이디 또는 주소 (예: blog.naver.com/아이디)', re: /blog\.naver\.com\/(?:PostList\.naver\?blogId=)?([\w-]+)/i, profile: (h) => 'https://blog.naver.com/' + h, write: (h) => (h ? 'https://blog.naver.com/' + h + '/postwrite' : 'https://blog.naver.com/'), writeLabel: '글쓰기' },
+    instagram: { name: '인스타그램', icon: 'instagram', color: '#D62976', ph: '@계정 또는 프로필 주소', re: /instagram\.com\/([\w.]+)/i, profile: (h) => 'https://www.instagram.com/' + h + '/', write: () => 'https://www.instagram.com/', writeLabel: '게시하기' },
+    youtube: { name: '유튜브', icon: 'youtube', color: '#E5372E', ph: '@핸들 또는 채널 주소', re: /youtube\.com\/@([^/?#]+)/i, profile: (h) => 'https://www.youtube.com/@' + h, write: () => 'https://www.youtube.com/upload', writeLabel: '영상 올리기' },
+    tiktok: { name: '틱톡', icon: 'tiktok', color: '#111', ph: '@계정 또는 프로필 주소', re: /tiktok\.com\/@([\w.]+)/i, profile: (h) => 'https://www.tiktok.com/@' + h, write: () => 'https://www.tiktok.com/upload', writeLabel: '영상 올리기' },
+    facebook: { name: '페이스북', badge: 'f', color: '#1877F2', ph: '페이지 아이디 또는 주소', re: /facebook\.com\/([\w.]+)/i, profile: (h) => 'https://www.facebook.com/' + h, write: () => 'https://www.facebook.com/', writeLabel: '게시하기' },
+    threads: { name: '스레드', badge: '@', color: '#111', ph: '@계정 또는 프로필 주소', re: /threads\.(?:net|com)\/@([\w.]+)/i, profile: (h) => 'https://www.threads.net/@' + h, write: () => 'https://www.threads.net/', writeLabel: '게시하기' },
+    x: { name: 'X (트위터)', badge: 'X', color: '#111', ph: '@계정 또는 프로필 주소', re: /(?:x|twitter)\.com\/(\w+)/i, profile: (h) => 'https://x.com/' + h, write: () => 'https://x.com/compose/post', writeLabel: '게시하기' },
+    kakao: { name: '카카오톡 채널', badge: 'K', color: '#FEE500', fg: '#3A1D1D', ph: '채널 주소 (예: pf.kakao.com/_abcd)', re: /pf\.kakao\.com\/([\w]+)/i, profile: (h) => 'https://pf.kakao.com/' + h, write: () => 'https://center-pf.kakao.com/', writeLabel: '소식 작성' },
+    band: { name: '네이버 밴드', badge: 'B', color: '#2DB400', ph: '밴드 주소 (예: band.us/band/12345678)', re: /band\.us\/band\/(\d+)/i, profile: (h) => 'https://band.us/band/' + h, write: (h) => (h ? 'https://band.us/band/' + h : 'https://band.us/'), writeLabel: '글쓰기' },
+    custom: { name: '기타 SNS', icon: 'link', color: '#3A6EA5', ph: '프로필·채널 주소 (https://…)' },
+  };
+  const ADDABLE = ['youtube', 'tiktok', 'facebook', 'threads', 'x', 'kakao', 'band', 'custom'];
+  const snsList = () => ((S && S.social && S.social.list) || []);
+  const snsName = (e) => e.name || SNS_TYPES[e.type].name;
+  const snsOn = (e) => !!(e.handle || e.url);
+  const snsProfile = (e) => e.url || (SNS_TYPES[e.type].profile && e.handle ? SNS_TYPES[e.type].profile(e.handle) : '');
+  const snsWrite = (e) => { const T = SNS_TYPES[e.type]; return T.write ? T.write(e.handle || '') : (e.url || ''); };
+  const snsBadge = (type, cls = '') => { const T = SNS_TYPES[type] || SNS_TYPES.custom; return '<span class="sns-badge ' + cls + '" style="background:' + T.color + ';color:' + (T.fg || '#fff') + '">' + (T.badge ? '<b>' + T.badge + '</b>' : icon(T.icon)) + '</span>'; };
+  function parseHandle(type, v) {
+    v = String(v || '').trim(); const T = SNS_TYPES[type];
+    if (type === 'custom') { const info = parseSocial(v); return info ? { url: info.url } : null; }
+    const m = T.re && T.re.exec(v);
+    let h = m ? m[1] : v.replace(/^@/, '').replace(/^https?:\/\/[^/]+\/?/i, '').replace(/[/?#].*$/, '');
+    try { h = decodeURIComponent(h); } catch (e) {}
+    if (!h || /\s/.test(h) || h.length > 60) return null;
+    return { handle: h };
+  }
+  const socialCount = () => snsList().filter(snsOn).length;
+
   function snsStrip() {
-    const s = S.social || {};
-    const chip = (k, label, on) => `<button class="sns-chip ${k} ${on ? 'on' : ''}" data-act="go" data-view="social">${icon(PLAT[k].icon, 'sm')} ${label}</button>`;
-    return `<div class="sns-strip card"><span class="sns-strip-t">${icon('share', 'sm')} 연동된 SNS</span>
-      ${chip('instagram', s.instagram ? '@' + esc(s.instagram) : '인스타그램 연결', !!s.instagram)}
-      ${chip('tiktok', s.tiktok ? '@' + esc(s.tiktok) : '틱톡 연결', !!s.tiktok)}
-      ${chip('youtube', s.youtube && s.youtube.title ? esc(s.youtube.title) : '유튜브 연결', !!(s.youtube && s.youtube.channelId))}
-      <button class="btn soft sm" data-act="ai-open" data-tab="sns" style="margin-left:auto">${icon('sparkle', 'sm')} 홍보글 만들기</button></div>`;
+    const chips = snsList().map((e) => '<button class="sns-chip ' + (snsOn(e) ? 'on' : '') + '" data-act="go" data-view="social">' + snsBadge(e.type, 'xs') + ' ' + esc(snsOn(e) ? snsName(e) + (e.handle ? ' · ' + e.handle : '') : snsName(e) + ' 연결') + '</button>').join('');
+    return '<div class="sns-strip card"><span class="sns-strip-t">' + icon('share', 'sm') + ' 연동된 SNS</span>' + chips +
+      '<button class="sns-chip" data-act="sns-add">' + icon('plus', 'sm') + ' SNS 추가</button>' +
+      '<button class="btn soft sm" data-act="ai-open" data-tab="sns" style="margin-left:auto">' + icon('sparkle', 'sm') + ' 홍보글 만들기</button></div>';
+  }
+
+  function snsCard(e) {
+    const T = SNS_TYPES[e.type] || SNS_TYPES.custom;
+    const head = '<div class="social-head">' + snsBadge(e.type) + '<b>' + esc(snsName(e)) + '</b>' + (snsOn(e) ? '<span class="tag" style="background:#E9F1EB;color:#3B6548">연결됨</span>' : '<span class="tag">연결 전</span>') +
+      (e.fixed ? '' : '<button class="icon-btn sm" data-act="sns-remove" data-id="' + e.id + '" title="이 SNS 빼기" aria-label="이 SNS 빼기">' + icon('trash', 'sm') + '</button>') + '</div>';
+    if (!snsOn(e)) {
+      return '<div class="card social-card">' + head + '<form class="social-form" data-submit="social-connect" data-id="' + e.id + '"><input class="input" name="v" placeholder="' + esc(T.ph || '') + '" autocomplete="off" /><button class="btn primary" type="submit">연결</button></form>' +
+        (e.type === 'naver' ? '<p class="social-note">블로그 주소 끝의 아이디만 넣어도 돼요. 예) blog.naver.com/<b>아이디</b></p>' : '') + '</div>';
+    }
+    const prof = snsProfile(e), write = snsWrite(e);
+    const notes = {
+      naver: '블로그에 올린 글 주소를 ‘게시물 가져오기’로 넣으면 활동 폴더에 차곡차곡 보관돼요. ‘글쓰기’를 누르면 블로그 글쓰기 화면이 열려요.',
+      instagram: '게시물·릴스 주소를 ‘게시물 가져오기’로 넣으면 보관함에서 바로 볼 수 있어요. 앱에서 바로 올리기는 Meta 비즈니스 앱 심사가 필요해서, 캡션 복사 후 인스타그램 창을 여는 방식이에요.',
+    };
+    const at = ['instagram', 'tiktok', 'threads', 'x'].includes(e.type) ? '@' : '';
+    return '<div class="card social-card">' + head +
+      '<div class="social-profile">' + snsBadge(e.type, 'lg') + '<div style="flex:1;min-width:0"><b>' + esc(e.handle ? at + e.handle : snsName(e)) + '</b><small>' + esc(prof.replace(/^https?:\/\/(www\.)?/, '')) + '</small></div></div>' +
+      '<div class="social-actions">' + (prof ? '<button class="btn sm" data-act="ext" data-url="' + esc(prof) + '">' + icon('external', 'sm') + ' 열기</button>' : '') +
+      (write ? '<button class="btn sm" data-act="sns-write" data-id="' + e.id + '">' + icon('pencil', 'sm') + ' ' + esc(T.writeLabel || '게시하기') + '</button>' : '') +
+      '<button class="btn sm" data-act="add-link" data-cat="act">' + icon('link', 'sm') + ' 게시물 가져오기</button>' +
+      '<button class="btn ghost sm" data-act="social-off" data-id="' + e.id + '">연결 해제</button></div>' +
+      (notes[e.type] ? '<p class="social-note">' + notes[e.type] + '</p>' : '') + '</div>';
   }
 
   function viewSocial() {
-    const s = S.social || {};
-    const yt = s.youtube || {};
-    const card = (k, body) => `<div class="card social-card ${k}"><div class="social-head"><span class="social-ico ${k}">${icon(PLAT[k].icon)}</span><b>${PLAT[k].name}</b>${(k === 'youtube' ? yt.channelId : s[k]) ? '<span class="tag" style="background:#E9F1EB;color:#3B6548">연결됨</span>' : '<span class="tag">연결 전</span>'}</div>${body}</div>`;
-    const form = (k, ph, label) => `<form class="social-form" data-submit="social-connect" data-k="${k}"><input class="input" name="v" placeholder="${ph}" autocomplete="off" /><button class="btn primary" type="submit">${label}</button></form>`;
-    const ig = s.instagram ? `<div class="social-profile"><div class="social-avatar ig">${icon('instagram', 'lg')}</div><div style="flex:1;min-width:0"><b>@${esc(s.instagram)}</b><small>인스타그램 계정</small></div></div>
-        <div class="social-actions"><button class="btn sm" data-act="ext" data-url="https://www.instagram.com/${encodeURIComponent(s.instagram)}/">${icon('external', 'sm')} 프로필 열기</button><button class="btn sm" data-act="add-link" data-cat="act">${icon('link', 'sm')} 게시물 가져오기</button><button class="btn sm" data-act="share-open">${icon('share', 'sm')} 게시하기</button><button class="btn ghost sm" data-act="social-off" data-k="instagram">연결 해제</button></div>
-        <p class="social-note">인스타그램은 게시물·릴스 주소를 ‘게시물 가져오기’로 붙여 넣으면 보관함에서 바로 재생돼요. 피드 전체 자동 불러오기와 앱에서 바로 올리기는 Meta의 비즈니스 앱 심사가 필요해서, 지금은 캡션 복사 후 인스타그램 창을 여는 방식으로 연결해요.</p>`
-      : form('instagram', '@계정 또는 프로필 주소 (예: @maeum_welfare)', '연결');
-    const tt = s.tiktok ? `<div class="social-profile"><div class="social-avatar tt">${icon('tiktok', 'lg')}</div><div style="flex:1;min-width:0"><b>@${esc(s.tiktok)}</b><small>틱톡 계정</small></div></div>
-        <div id="ttEmbed" class="tt-embed"></div>
-        <div class="social-actions"><button class="btn sm" data-act="ext" data-url="https://www.tiktok.com/@${encodeURIComponent(s.tiktok)}">${icon('external', 'sm')} 프로필 열기</button><button class="btn sm" data-act="add-link" data-cat="act">${icon('link', 'sm')} 영상 가져오기</button><button class="btn sm" data-act="share-open">${icon('share', 'sm')} 영상 올리기</button><button class="btn ghost sm" data-act="social-off" data-k="tiktok">연결 해제</button></div>`
-      : form('tiktok', '@계정 또는 프로필 주소 (예: @maeum_welfare)', '연결');
-    const ytb = yt.channelId ? `<div class="social-profile">${yt.thumb ? `<img class="social-avatar" src="${esc(yt.thumb)}" alt="" referrerpolicy="no-referrer" />` : `<div class="social-avatar yt">${icon('youtube', 'lg')}</div>`}<div style="flex:1;min-width:0"><b>${esc(yt.title)}</b><small>${yt.handle ? esc(yt.handle) + ' · ' : ''}${yt.subs != null ? '구독자 ' + Number(yt.subs).toLocaleString() + '명 · ' : ''}영상 ${Number(yt.videos || 0).toLocaleString()}개</small></div></div>
-        <div class="section-head" style="margin:14px 0 8px"><h3 style="font-size:14.5px">최신 영상</h3><button class="link-btn" data-act="yt-refresh">${icon('refresh', 'sm')} 새로고침</button></div>
-        <div id="ytLatest" class="yt-grid"><div class="thinking"><i></i><i></i><i></i> 채널 영상을 불러오는 중이에요…</div></div>
-        <div class="social-actions"><button class="btn sm" data-act="ext" data-url="https://www.youtube.com/channel/${esc(yt.channelId)}">${icon('external', 'sm')} 채널 열기</button><button class="btn sm" data-act="ext" data-url="https://www.youtube.com/upload">${icon('upload', 'sm')} 영상 올리기</button><button class="btn ghost sm" data-act="social-off" data-k="youtube">연결 해제</button></div>`
-      : form('youtube', '@핸들 또는 채널 주소 (예: @maeumwelfare, youtube.com/@…)', '채널 찾기');
-    return `<div class="page-head"><div><h2>${icon('share', 'lg')} SNS 연동</h2><p>기관 인스타그램 · 틱톡 · 유튜브를 연결하고, 활동 소식을 홍보글로 만들어 바로 올려 보세요.</p></div>
-        <div class="toolbar"><button class="btn" data-act="add-link" data-cat="act">${icon('link')}<span class="lbl">게시물 가져오기</span></button><button class="btn accent" data-act="ai-open" data-tab="sns">${icon('sparkle')}<span class="lbl">홍보글 만들기</span></button></div></div>
-      <div class="social-grid">${card('instagram', ig)}${card('tiktok', tt)}${card('youtube', ytb)}</div>
-      <div class="card social-flow"><b>${icon('heart', 'sm')} 이렇게 쓰면 편해요</b>
-        <ol><li>활동을 기록하고 <b>마음기록 도우미 → SNS</b>로 인스타 캡션 · 틱톡 대본 · 유튜브 설명을 한 번에 만들어요.</li>
-        <li><b>SNS로 공유</b>를 누르면 개인정보를 한 번 더 점검하고, 캡션을 복사한 뒤 각 앱의 올리기 화면을 열어 드려요. 휴대폰에서는 사진까지 앱으로 바로 넘어가요.</li>
-        <li>올린 게시물 주소를 <b>게시물 가져오기</b>로 붙여 넣으면 ‘활동’ 폴더에 차곡차곡 쌓여요.</li></ol></div>`;
+    return '<div class="page-head"><div><h2>' + icon('share', 'lg') + ' SNS 연동</h2><p>기관 네이버 블로그 · 인스타그램을 연결하고, 필요한 SNS는 ‘SNS 추가하기’로 더 넣을 수 있어요.</p></div>' +
+      '<div class="toolbar"><button class="btn" data-act="sns-add">' + icon('plus') + '<span class="lbl">SNS 추가하기</span></button><button class="btn" data-act="add-link" data-cat="act">' + icon('link') + '<span class="lbl">게시물 가져오기</span></button><button class="btn accent" data-act="ai-open" data-tab="sns">' + icon('sparkle') + '<span class="lbl">홍보글 만들기</span></button></div></div>' +
+      '<div class="social-grid">' + snsList().map(snsCard).join('') +
+      '<button class="card social-card social-add" data-act="sns-add">' + icon('plus', 'lg') + '<b>SNS 추가하기</b><small>유튜브 · 틱톡 · 페이스북 · 스레드 · X · 카카오톡 채널 · 밴드 · 기타</small></button></div>' +
+      '<div class="card social-flow"><b>' + icon('heart', 'sm') + ' 이렇게 쓰면 편해요</b><ol>' +
+      '<li>활동을 기록하고 <b>마음기록 도우미 → SNS 홍보</b>로 블로그 글 · 인스타 캡션을 한 번에 만들어요.</li>' +
+      '<li><b>SNS로 공유</b>를 누르면 개인정보를 한 번 더 점검하고, 글을 복사한 뒤 블로그 글쓰기 · 인스타그램 화면을 열어 드려요. 휴대폰에서는 사진까지 앱으로 넘어가요.</li>' +
+      '<li>올린 글 주소를 <b>게시물 가져오기</b>로 붙여 넣으면 ‘활동’ 폴더에 차곡차곡 쌓여요.</li></ol></div>';
   }
-  async function afterSocialRender(force = false) {
-    const s = S.social || {};
-    const box = $('#ytLatest');
-    if (box && s.youtube && s.youtube.uploads) {
-      try {
-        if (force || !s.youtube.latest || now() - (s.youtube.latestAt || 0) > 10 * 60000) { s.youtube.latest = await ytLatest(s.youtube.uploads); s.youtube.latestAt = now(); save(); }
-        const list = s.youtube.latest || [];
-        const b2 = $('#ytLatest'); if (!b2) return;
-        b2.innerHTML = list.length ? list.map((v) => `<div class="yt-item"><button class="yt-thumb" data-act="yt-play" data-id="${esc(v.id)}" data-title="${esc(v.title)}"><img src="${esc(v.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer" /><span>${icon('youtube')}</span></button><b>${esc(v.title)}</b><small>${dotDate(Date.parse(v.date))}</small><button class="btn ghost sm" data-act="yt-save" data-id="${esc(v.id)}" data-title="${esc(v.title)}">${icon('save', 'sm')} 보관함에 저장</button></div>`).join('') : '<p class="cell-muted">아직 공개된 영상이 없어요.</p>';
-      } catch (e) { const b2 = $('#ytLatest'); if (b2) b2.innerHTML = `<div class="err-box">${esc(e.message)}</div>`; }
-    }
-    const tt = $('#ttEmbed');
-    if (tt && s.tiktok) {
-      const h = esc(s.tiktok);
-      tt.innerHTML = `<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@${h}" data-unique-id="${h}" data-embed-type="creator" style="max-width:100%;min-width:288px;margin:0"><section><a target="_blank" rel="noopener" href="https://www.tiktok.com/@${h}?refer=creator_embed">@${h}</a></section></blockquote>`;
-      document.querySelectorAll('script[data-tt-embed]').forEach((x) => x.remove());
-      const sc = document.createElement('script'); sc.src = 'https://www.tiktok.com/embed.js'; sc.async = true; sc.dataset.ttEmbed = '1'; document.body.appendChild(sc);
-    }
+  function afterSocialRender() {}
+
+  function socialConnect(id, v) {
+    const e = snsList().find((x) => x.id === id); if (!e) return;
+    if (!String(v || '').trim()) { toast('아이디나 주소를 입력해 주세요.', { type: 'warn' }); return; }
+    const r = parseHandle(e.type, v);
+    if (!r) { toast('아이디나 주소 형식을 확인해 주세요.', { type: 'warn' }); return; }
+    Object.assign(e, r); save(); renderAll(); toast(snsName(e) + '을(를) 연결했어요.');
   }
-  async function socialConnect(k, v) {
-    v = String(v || '').trim(); if (!v) { toast('계정이나 주소를 입력해 주세요.', { type: 'warn' }); return; }
-    S.social ||= {};
-    if (k === 'instagram' || k === 'tiktok') {
-      const m = /(?:instagram\.com|tiktok\.com)\/@?([\w.]+)/i.exec(v);
-      const handle = (m ? m[1] : v).replace(/^@/, '').replace(/[/?#].*$/, '');
-      if (!/^[\w.]{1,30}$/.test(handle)) { toast('계정 이름 형식을 확인해 주세요.', { type: 'warn' }); return; }
-      S.social[k] = handle;
-    } else {
-      toast('유튜브 채널을 찾고 있어요…');
-      try { S.social.youtube = await ytResolveChannel(v); }
-      catch (e) { toast(e.message, { type: 'warn', ms: 5000 }); return; }
-    }
-    save(); renderAll(); toast(`${PLAT[k].name}을(를) 연결했어요.`);
+  function openSnsAdd() {
+    let type = 'youtube';
+    const m = openModal({ title: 'SNS 추가하기', sub: '기관에서 쓰는 SNS를 골라 연결해 주세요.', size: 'mid', body:
+      '<div class="sns-pick">' + ADDABLE.map((k) => '<button type="button" class="sns-pick-btn" data-type="' + k + '">' + snsBadge(k) + '<span>' + SNS_TYPES[k].name + '</span></button>').join('') + '</div>' +
+      '<label class="field" id="saNameWrap" hidden><span>SNS 이름</span><input class="input" id="saName" placeholder="예) 티스토리 블로그, 네이버 카페" maxlength="20" /></label>' +
+      '<label class="field"><span id="saLabel">계정 또는 주소</span><input class="input" id="saVal" autocomplete="off" /></label>',
+      foot: '<button class="btn ghost" data-close>취소</button><button class="btn primary" data-ok>' + icon('plus', 'sm') + ' 추가하기</button>' });
+    const sync = () => {
+      m.el.querySelectorAll('.sns-pick-btn').forEach((b) => b.classList.toggle('on', b.dataset.type === type));
+      m.el.querySelector('#saNameWrap').hidden = type !== 'custom';
+      m.el.querySelector('#saVal').placeholder = SNS_TYPES[type].ph || '';
+      m.el.querySelector('#saLabel').textContent = type === 'custom' ? '프로필 · 채널 주소' : SNS_TYPES[type].name + ' 계정 또는 주소';
+    };
+    sync();
+    m.el.querySelector('.sns-pick').addEventListener('click', (ev) => { const b = ev.target.closest('[data-type]'); if (b) { type = b.dataset.type; sync(); m.el.querySelector(type === 'custom' ? '#saName' : '#saVal').focus(); } });
+    m.el.querySelector('[data-ok]').onclick = () => {
+      const val = m.el.querySelector('#saVal').value;
+      const name = m.el.querySelector('#saName').value.trim();
+      if (type === 'custom' && !name) { toast('SNS 이름을 적어 주세요.', { type: 'warn' }); m.el.querySelector('#saName').focus(); return; }
+      const r = parseHandle(type, val);
+      if (!r) { toast('계정이나 주소 형식을 확인해 주세요.', { type: 'warn' }); m.el.querySelector('#saVal').focus(); return; }
+      S.social.list.push({ id: uid('sns'), type, name: type === 'custom' ? name : '', ...r });
+      save(); m.close(true); go({ view: 'social' }); toast((type === 'custom' ? name : SNS_TYPES[type].name) + '을(를) 추가했어요.');
+    };
   }
 
   /* ---------- SNS로 공유 ---------- */
@@ -1015,41 +1070,38 @@
     if (d && d.kind === 'link' && !text) text = d.url;
     const canNative = !!navigator.share;
     const canFiles = !!(file && navigator.canShare && navigator.canShare({ files: [file] }));
-    const s = S.social || {};
-    const m = openModal({ title: 'SNS로 공유하기', sub: '캡션을 복사하고 올리기 화면을 열어 드려요.', size: 'mid', body: `
-      ${file ? `<div class="share-file">${icon('image', 'sm')} 첨부 사진 : <b>${esc(d.name)}</b>${canFiles ? '' : ' <span class="cell-muted">(PC에서는 사진을 직접 선택해 올려 주세요)</span>'}</div>` : ''}
-      <label class="field"><span>캡션 · 설명</span><textarea class="textarea" id="shText" style="min-height:200px">${esc(text)}</textarea></label>
-      <div id="shPii"></div>
-      <div class="share-grid">
-        <button class="share-btn ig" data-sh="instagram">${icon('instagram')}<b>인스타그램</b><small>${s.instagram ? '@' + esc(s.instagram) : '캡션 복사 후 열기'}</small></button>
-        <button class="share-btn tt" data-sh="tiktok">${icon('tiktok')}<b>틱톡</b><small>${s.tiktok ? '@' + esc(s.tiktok) : '업로드 화면 열기'}</small></button>
-        <button class="share-btn yt" data-sh="youtube">${icon('youtube')}<b>유튜브</b><small>${s.youtube && s.youtube.title ? esc(s.youtube.title) : '업로드 화면 열기'}</small></button>
-        ${canNative ? `<button class="share-btn etc" data-sh="native">${icon('share')}<b>휴대폰 앱으로</b><small>${canFiles ? '사진 + 캡션 함께' : '캡션 공유'}</small></button>` : ''}
-      </div>`,
-      foot: `<div class="left"><button class="btn ghost sm" data-sh="ai">${icon('sparkle', 'sm')} 도우미로 홍보글 만들기</button></div><button class="btn ghost" data-close>닫기</button><button class="btn" data-sh="copy">${icon('copy', 'sm')} 캡션만 복사</button>` });
+    const targets = snsList().filter((e) => e.fixed || snsOn(e));
+    const m = openModal({ title: 'SNS로 공유하기', sub: '글을 복사하고 올리기 화면을 열어 드려요.', size: 'mid', body:
+      (file ? '<div class="share-file">' + icon('image', 'sm') + ' 첨부 사진 : <b>' + esc(d.name) + '</b>' + (canFiles ? '' : ' <span class="cell-muted">(PC에서는 사진을 직접 선택해 올려 주세요)</span>') + '</div>' : '') +
+      '<label class="field"><span>글 · 캡션</span><textarea class="textarea" id="shText" style="min-height:200px">' + esc(text) + '</textarea></label><div id="shPii"></div>' +
+      '<div class="share-grid">' + targets.map((e) => '<button class="share-btn" data-sh="' + e.id + '">' + snsBadge(e.type, 'sm') + '<b>' + esc(snsName(e)) + '</b><small>' + esc(e.handle ? e.handle : snsOn(e) ? '연결됨' : '복사 후 열기') + '</small></button>').join('') +
+      (canNative ? '<button class="share-btn" data-sh="native">' + snsBadge('custom', 'sm') + '<b>휴대폰 앱으로</b><small>' + (canFiles ? '사진 + 글 함께' : '글 공유') + '</small></button>' : '') +
+      '<button class="share-btn add" data-sh="add">' + icon('plus') + '<b>SNS 추가</b><small>다른 SNS 연결</small></button></div>',
+      foot: '<div class="left"><button class="btn ghost sm" data-sh="ai">' + icon('sparkle', 'sm') + ' 도우미로 홍보글 만들기</button></div><button class="btn ghost" data-close>닫기</button><button class="btn" data-sh="copy">' + icon('copy', 'sm') + ' 글만 복사</button>' });
     const $t = m.el.querySelector('#shText');
     const piiCheck = () => {
       const hits = PII.scan($t.value).filter((h) => !h.info);
-      const box = m.el.querySelector('#shPii');
-      box.innerHTML = hits.length ? `<div class="err-box" style="margin:0 0 12px">${icon('shield', 'sm')} 캡션에 개인정보로 보이는 내용이 ${hits.length}곳 있어요: ${esc([...new Set(hits.map((h) => h.kind))].join(', '))} <button class="btn sm" data-sh="mask" style="margin-left:6px">가명 처리하기</button></div>` : '<div class="ok-box" style="margin:0 0 12px">' + icon('check', 'sm') + ' 캡션에서 눈에 띄는 개인정보는 없어요. 사진 속 얼굴·이름표도 한 번 더 확인해 주세요.</div>';
+      m.el.querySelector('#shPii').innerHTML = hits.length
+        ? '<div class="err-box" style="margin:0 0 12px">' + icon('shield', 'sm') + ' 글에 개인정보로 보이는 내용이 ' + hits.length + '곳 있어요: ' + esc([...new Set(hits.map((h) => h.kind))].join(', ')) + ' <button class="btn sm" data-sh="mask" style="margin-left:6px">가명 처리하기</button></div>'
+        : '<div class="ok-box" style="margin:0 0 12px">' + icon('check', 'sm') + ' 글에서 눈에 띄는 개인정보는 없어요. 사진 속 얼굴·이름표도 한 번 더 확인해 주세요.</div>';
     };
     piiCheck(); $t.addEventListener('input', () => { clearTimeout($t._t); $t._t = setTimeout(piiCheck, 300); });
-    const copy = async () => { try { await navigator.clipboard.writeText($t.value); return true; } catch (e) { $t.select(); document.execCommand('copy'); return true; } };
-    const urls = { instagram: 'https://www.instagram.com/', tiktok: 'https://www.tiktok.com/upload', youtube: 'https://www.youtube.com/upload' };
-    m.el.addEventListener('click', async (e) => {
-      const b = e.target.closest('[data-sh]'); if (!b) return;
+    const copy = async () => { try { await navigator.clipboard.writeText($t.value); } catch (e) { $t.select(); document.execCommand('copy'); } };
+    m.el.addEventListener('click', async (ev) => {
+      const b = ev.target.closest('[data-sh]'); if (!b) return;
       const a = b.dataset.sh;
       if (a === 'mask') { $t.value = PII.pseudonymize($t.value, PII.scan($t.value), 'alias'); piiCheck(); return; }
-      if (a === 'copy') { await copy(); toast('캡션을 복사했어요.'); return; }
+      if (a === 'copy') { await copy(); toast('글을 복사했어요.'); return; }
+      if (a === 'add') { m.close(true); openSnsAdd(); return; }
       if (a === 'ai') { m.close(true); openAI('sns', { fields: { text: $t.value.slice(0, 4000), title: d ? d.name : title } }); return; }
       if (a === 'native') {
         try { await navigator.share(canFiles ? { files: [file], text: $t.value, title } : { text: $t.value, title }); toast('공유 창을 열었어요.'); }
         catch (err) { if (err.name !== 'AbortError') toast('공유하지 못했어요: ' + err.message, { type: 'warn' }); }
         return;
       }
-      await copy();
-      openExternal(urls[a]);
-      toast(`캡션을 복사했어요. 열린 ${PLAT[a].name} 창에서 붙여 넣어 주세요.`, { ms: 4500 });
+      const e = snsList().find((x) => x.id === a); if (!e) return;
+      await copy(); openExternal(snsWrite(e) || snsProfile(e));
+      toast('글을 복사했어요. 열린 ' + snsName(e) + ' 화면에서 붙여 넣어 주세요.', { ms: 4500 });
     });
   }
 
@@ -1420,8 +1472,8 @@
       ${piiLocalBox()}
       ${resultBox(tab)}`;
     if (tab === 'sns') return `
-      <div class="ai-intro"><b>활동을 SNS 홍보글로.</b> 인스타그램 캡션, 틱톡·쇼츠 대본, 유튜브 제목·설명을 한 번에 만들어요. 실명·연락처는 자동으로 빼고 써요.</div>
-      <div class="field"><span>플랫폼</span>${seg(tab, 'platform', [['all', '전체'], ['instagram', '인스타그램'], ['tiktok', '틱톡·쇼츠'], ['youtube', '유튜브']])}</div>
+      <div class="ai-intro"><b>활동을 SNS 홍보글로.</b> 네이버 블로그 글과 인스타그램 캡션을 한 번에 만들어요. 추가한 SNS용 글도 고를 수 있어요. 실명·연락처는 자동으로 빼고 써요.</div>
+      <div class="field"><span>플랫폼</span>${seg(tab, 'platform', [['all', '블로그 + 인스타'], ['naver', '네이버 블로그'], ['instagram', '인스타그램']].concat(snsList().filter((e) => !e.fixed).map((e) => ['x:' + snsName(e), esc(snsName(e))])))}</div>
       <label class="field"><span>활동명</span><input class="input" data-f="title" value="${fv(tab, 'title')}" placeholder="예) 초록 화요일 원예교실" /></label>
       <label class="field"><span>활동 내용</span>${loadDocSelect(tab, 'text')}<textarea class="textarea" data-f="text" placeholder="누가, 언제, 무엇을 했고 어떤 변화가 있었는지 편하게 적어 주세요.">${fv(tab, 'text')}</textarea></label>
       <div class="field"><span>분위기</span>${seg(tab, 'tone', [['따뜻하고 다정하게', '따뜻하게'], ['밝고 경쾌하게', '경쾌하게'], ['신뢰감 있게 정보 중심으로', '정보 중심'], ['감동적인 이야기 형식으로', '이야기형']])}</div>
@@ -1515,6 +1567,7 @@
     if (tab === 'summary' && fields.style === 'polish') task = 'polish';
     if (tab === 'privacy') { const hits = PII.scan(fields.text); st.local = { hits, groups: PII.group(hits) }; fields.localFindings = PII.summary(hits); }
     if (tab === 'memo') fields.worker = S.settings.userName || '';
+    if (tab === 'sns' && String(fields.platform || '').startsWith('x:')) fields.platformName = fields.platform.slice(2);
     try {
       await MaeumAI.run({ task, fields, signal: ctrl.signal, onToken: (piece, all) => {
         st.result = all;
@@ -1824,7 +1877,10 @@
     lock: () => lock(),
     ext: (el) => openExternal(el.dataset.url),
     'share-open': () => openShare({}),
-    'social-off': async (el) => { const k = el.dataset.k; if (!(await confirmBox(`${PLAT[k].name} 연결을 해제할까요?\n보관함에 저장한 게시물은 그대로 남아요.`, { ok: '해제하기' }))) return; delete S.social[k]; save(); renderAll(); toast('연결을 해제했어요.'); },
+    'social-off': async (el) => { const e = snsList().find((x) => x.id === el.dataset.id); if (!e) return; if (!(await confirmBox(`${snsName(e)} 연결을 해제할까요?\n보관함에 저장한 게시물은 그대로 남아요.`, { ok: '해제하기' }))) return; delete e.handle; delete e.url; save(); renderAll(); toast('연결을 해제했어요.'); },
+    'sns-add': () => openSnsAdd(),
+    'sns-remove': async (el) => { const e = snsList().find((x) => x.id === el.dataset.id); if (!e || e.fixed) return; if (!(await confirmBox(`${snsName(e)}을(를) SNS 목록에서 뺄까요?`, { ok: '빼기', danger: true }))) return; S.social.list = S.social.list.filter((x) => x !== e); save(); renderAll(); toast('목록에서 뺐어요.'); },
+    'sns-write': (el) => { const e = snsList().find((x) => x.id === el.dataset.id); if (e) openExternal(snsWrite(e)); },
     'yt-refresh': () => afterSocialRender(true),
     'yt-play': (el) => { const m = openModal({ title: el.dataset.title, size: 'mid', body: `<div class="embed-box youtube" style="aspect-ratio:16/9"><iframe src="https://www.youtube-nocookie.com/embed/${esc(el.dataset.id)}?autoplay=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`, foot: `<button class="btn ghost" data-close>닫기</button><button class="btn primary" data-ok>${icon('save', 'sm')} 보관함에 저장</button>` }); m.el.querySelector('[data-ok]').onclick = () => { saveYt(el.dataset.id, el.dataset.title); m.close(true); }; },
     'yt-save': (el) => saveYt(el.dataset.id, el.dataset.title),
@@ -1874,7 +1930,7 @@
       setTimeout(() => { const i = $(`[data-cl="${c.id}"] input[name=t]`); i && i.focus(); }, 20);
     }
     if (f.dataset.submit === 'chat-send') chatSend(f.q.value);
-    if (f.dataset.submit === 'social-connect') socialConnect(f.dataset.k, f.v.value);
+    if (f.dataset.submit === 'social-connect') socialConnect(f.dataset.id, f.v.value);
   });
   // 도우미 입력값 보존
   $('#aiPanel').addEventListener('input', (e) => {
@@ -1942,7 +1998,7 @@
       <ul class="auth-feats">
         <li>${icon('folder', 'sm')} 일반·활동 서류를 폴더로 차곡차곡</li>
         <li>${icon('sparkle', 'sm')} 마음기록 도우미가 상담 일지·보고서 초안을 함께</li>
-        <li>${icon('heart', 'sm')} 교육 · 정보 · 활동 라운지와 인스타 · 틱톡 · 유튜브 연동</li>
+        <li>${icon('heart', 'sm')} 교육 · 정보 · 활동 라운지와 네이버 블로그 · 인스타그램 연동</li>
       </ul>
       <button class="g-btn" id="gSignIn">${G_LOGO}<span>Google로 3초 만에 시작하기</span></button>
       <small class="auth-hint">처음이면 이 버튼 하나로 가입이 끝나요. 따로 적을 양식은 없어요.</small>
